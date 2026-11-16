@@ -17,8 +17,10 @@ export function configuration(env = process.env) {
     if (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) throw new Error('Remote AI endpoints require HTTPS.');
   }
   const model = env.AI_MODEL || (mode === 'ollama' ? 'llama3.2' : '');
+  const publicDemo = env.PUBLIC_DEMO === 'true';
+  if (publicDemo && base !== 'https://api.groq.com/openai/v1') throw new Error('Public demo currently supports only the approved Groq endpoint.');
   const ready = Boolean(base && model && (mode === 'ollama' || env.AI_API_KEY));
-  return { mode, base, model, ready, key: env.AI_API_KEY || '', token: env.APP_ACCESS_TOKEN || '', host: env.HOST || '127.0.0.1', port: Number(env.PORT) || 3000 };
+  return { publicDemo, mode, base, model, ready, key: env.AI_API_KEY || '', token: env.APP_ACCESS_TOKEN || '', host: env.HOST || '127.0.0.1', port: Number(env.PORT) || 3000 };
 }
 
 export function validateChat(body) {
@@ -48,6 +50,10 @@ async function readBody(req) {
 
 export function createApp({ config = configuration(), fetchImpl = fetch } = {}) {
   const buckets = new Map();
+  let activeRequests = 0;
+  let minute = { count: 0, until: 0 };
+  let day = { count: 0, until: 0 };
+  const providerName = config.base === 'https://api.groq.com/openai/v1' ? 'Groq' : 'configured provider';
   return http.createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -59,31 +65,39 @@ export function createApp({ config = configuration(), fetchImpl = fetch } = {}) 
       if (req.method === 'GET' && url.pathname === '/api/auth/config') return json(res, 200, { googleEnabled: false, githubEnabled: false, googleClientId: '' });
       if (req.method === 'GET' && url.pathname === '/api/models') return json(res, 200, { model: config.model, mode: config.mode });
       if (url.pathname.startsWith('/api/auth/')) return json(res, 501, { error: 'Accounts are not included in this MVP. Use Continue as guest. Your data stays in this browser.' });
-      if (req.method === 'GET' && url.pathname === '/api/config') return json(res, 200, { mode: config.mode, model: config.model, configured: config.ready, protected: Boolean(config.token), memory: 'browser-only' });
+      if (req.method === 'GET' && url.pathname === '/api/config') return json(res, 200, { mode: config.mode, model: config.model, configured: config.ready, protected: Boolean(config.token), publicDemo: Boolean(config.publicDemo), provider: providerName, memory: 'browser-only' });
       if (req.method === 'POST' && url.pathname === '/api/chat') {
         if (!config.ready) return json(res, 503, { error: 'No AI is configured. Set AI_MODE, AI_BASE_URL, AI_MODEL and, for a hosted API, AI_API_KEY on the server.' });
         // Same-origin browser requests plus a configured access token for any remote use.
         const origin = req.headers.origin;
         if (origin && new URL(origin).host !== req.headers.host) return json(res, 403, { error: 'Cross-origin request refused.' });
         if (config.token && req.headers.authorization !== `Bearer ${config.token}`) return json(res, 401, { error: 'Enter the app access token in Connection settings.' });
-        if (!config.token && !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)) return json(res, 403, { error: 'Set APP_ACCESS_TOKEN before sharing the server.' });
+        if (!config.publicDemo && !config.token && !['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress)) return json(res, 403, { error: 'Set APP_ACCESS_TOKEN before sharing the server.' });
         const now = Date.now();
         for (const [key, value] of buckets) if (value.until < now) buckets.delete(key);
-        const ip = req.socket.remoteAddress; const bucket = buckets.get(ip) || { count: 0, until: now + 60000 };
-        if (++bucket.count > 20) return json(res, 429, { error: 'Please wait a minute before sending more messages.' });
+        const ip = config.publicDemo && req.headers['x-vercel-id'] ? String(req.headers['x-forwarded-for'] || req.socket.remoteAddress).split(',')[0].trim() : req.socket.remoteAddress; const bucket = buckets.get(ip) || { count: 0, until: now + 60000 };
+        if (++bucket.count > (config.publicDemo ? 5 : 20)) return json(res, 429, { error: 'Please wait a minute before sending more messages.' });
         buckets.set(ip, bucket);
         const body = await readBody(req);
         if (body.attachment) return json(res, 400, { error: 'This essential MVP is text-only. File and image AI are not connected.' });
         const chat = validateChat(body);
+        if (config.publicDemo) {
+          if (JSON.stringify(chat).length > 10000 || chat.messages.at(-1).content.length > 2000) return json(res, 400, { error: 'Public demo allows 2,000 characters per new message and 10,000 characters of total chat context including memory. Start a new chat or shorten memory notes.' });
+          if (minute.until < now) minute = { count: 0, until: now + 60000 };
+          if (day.until < now) day = { count: 0, until: now + 86400000 };
+          if (activeRequests >= 2 || minute.count >= 15 || day.count >= 150) return json(res, 429, { error: 'This free public demo is busy or has reached a usage limit. Please try again later. Limits are shared; no paid fallback is enabled.' });
+          minute.count++; day.count++;
+        }
+        activeRequests++;
         const abort = new AbortController();
         const timer = setTimeout(() => abort.abort(), config.timeoutMs || 90000);
         res.on('close', () => { if (!res.writableEnded) abort.abort(); });
         try {
           const upstream = await fetchImpl(`${config.base}/chat/completions`, {
             method: 'POST', headers: { 'Content-Type': 'application/json', ...(config.key ? { Authorization: `Bearer ${config.key}` } : {}) },
-            body: JSON.stringify({ model: config.model, messages: buildMessages(chat), stream: true, temperature: 0.7, max_tokens: 1000 }), signal: abort.signal,
+            body: JSON.stringify({ model: config.model, messages: buildMessages(chat), stream: true, temperature: 0.7, max_tokens: config.publicDemo ? 600 : 1000 }), signal: abort.signal,
           });
-          if (!upstream.ok) { await upstream.body?.cancel(); return json(res, 502, { error: `The AI provider returned HTTP ${upstream.status}. Check the server configuration, model availability and quota.` }); }
+          if (!upstream.ok) { await upstream.body?.cancel(); if (upstream.status === 429) return json(res, 429, { error: 'The free AI provider quota or rate limit is reached. Please wait for it to reset. No paid fallback is enabled.' }); return json(res, 502, { error: `The AI provider returned HTTP ${upstream.status}. Check the server configuration, model availability and quota.` }); }
           const type = upstream.headers.get('content-type') || '';
           if (!type.includes('text/event-stream')) {
             const data = await upstream.json(); const text = data.choices?.[0]?.message?.content;
@@ -115,7 +129,7 @@ export function createApp({ config = configuration(), fetchImpl = fetch } = {}) 
         } catch {
           if (res.headersSent) res.end(`data: ${JSON.stringify({ type: 'error', error: 'AI connection interrupted or timed out. Any partial answer is kept.' })}\n\n`);
           else json(res, 502, { error: 'Could not reach the AI. For local mode, start Ollama on the same computer as this server. Check the server configuration.' });
-        } finally { clearTimeout(timer); }
+        } finally { activeRequests--; clearTimeout(timer); }
         return;
       }
       if (url.pathname.startsWith('/api/')) return json(res, 404, { error: 'Unknown API route.' });
