@@ -28,52 +28,7 @@ export interface ProjectItem {
   lastActive: string;
 }
 
-const DEFAULT_PROJECTS: ProjectItem[] = [
-  {
-    id: "p1",
-    title: "Karishma Native Android APK",
-    category: "mobile",
-    desc: "Capacitor runtime integration, hardware back button routing, safe-area insets, and dark status bar theme.",
-    progress: 92,
-    badgeColor: "var(--k0)",
-    tasksCount: 12,
-    completedTasks: 11,
-    lastActive: "Today",
-  },
-  {
-    id: "p2",
-    title: "Banglish TTS & Voice Normalizer",
-    category: "ai",
-    desc: "Phonetic dictionary engine, vowel cadence restoration, and Web Speech API synthesis integration.",
-    progress: 100,
-    badgeColor: "var(--k1)",
-    tasksCount: 8,
-    completedTasks: 8,
-    lastActive: "Nov 8, 2026",
-  },
-  {
-    id: "p3",
-    title: "Supabase & Postgres Resilient Store",
-    category: "backend",
-    desc: "Multi-layered persistence, user-partitioned conversation sessions, and zero-downtime in-memory fallback.",
-    progress: 88,
-    badgeColor: "var(--k3)",
-    tasksCount: 15,
-    completedTasks: 13,
-    lastActive: "Nov 7, 2026",
-  },
-  {
-    id: "p4",
-    title: "Claymorphic Multi-View Design Suite",
-    category: "design",
-    desc: "Panoramic twilight atelier artworks, floating butterfly swarms, ripple interactions, and tactile pastel cards.",
-    progress: 95,
-    badgeColor: "var(--k4)",
-    tasksCount: 10,
-    completedTasks: 9,
-    lastActive: "Just now",
-  },
-];
+const DEFAULT_PROJECTS: ProjectItem[] = [];
 
 interface ProjectsPageProps {
   onSendToChat?: (prompt: string) => void;
@@ -149,6 +104,20 @@ export function ProjectsPage({ onSendToChat, onToast }: ProjectsPageProps) {
 
       {/* Grid of Projects */}
       <div className="mp-g">
+        {filtered.length === 0 && (
+          <div
+            className="mp-c mp-rise"
+            style={{ "--i": 3, gridColumn: "1 / -1", cursor: "default" } as React.CSSProperties}
+          >
+            <span className="mp-ic" style={{ background: "var(--lav)" }}>
+              <FolderGit2 className="i" />
+            </span>
+            <div>
+              <b>No projects yet</b>
+              <span className="t">Workspaces you create with Karishma will appear here.</span>
+            </div>
+          </div>
+        )}
         {filtered.map((proj, i) => (
           <button
             key={proj.id}
