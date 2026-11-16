@@ -13,7 +13,7 @@ A small hackathon MVP built from the supplied Karishma frontend. The original Re
 
 ## Honest MVP limits
 
-The hosted site starts with **no AI connected**. It shows a configuration error, never a pretend AI answer. Model transport was tested with mocked replies; a real provider or local model still needs a separate live test.
+An unconfigured deployment shows a configuration error, never a pretend AI answer. The approved hosted demo uses Groq Free with `openai/gpt-oss-20b` in explicit public mode, described below. Real Groq text chat and saved-memory context have been tested in addition to the mocked transport tests. Gemini backup is not connected.
 
 The other original screens remain to preserve the requested exact UI. Agents, Studio, Files, Projects and Explore contain sample/preview content, not connected services. The model picker is a visual preview; change the actual model in the server environment. Some deterministic local tools are retained, but they are not a general AI tool suite. File/image AI, cloud accounts, social login, cross-device sync, MFA, encryption and automatic source-code repair are **not implemented**. Unsupported actions show that limit instead of simulating success.
 
@@ -49,13 +49,13 @@ For frontend development, run `npm start` in one terminal and `npm run dev` in a
 
 Set `AI_MODE=openai`, the provider's exact `AI_BASE_URL` ending in `/v1`, its exact `AI_MODEL` identifier and `AI_API_KEY` in the **server** `.env`. Do not put keys in frontend files, browser storage, a commit, or chat. Compatible is a protocol, not a promise that any particular provider is free or that every provider feature works. No paid provider has been chosen or activated.
 
-Before exposing a configured model endpoint to other people, set a long random `APP_ACCESS_TOKEN`. In the site's **Settings > MVP Connection**, enter only that app token, not the provider key. The app token stays in the current tab's session storage. A non-loopback local server refuses to start without the token. Use HTTPS for any remote deployment. This is a personal demonstration gate, not a multi-user authentication system. The in-memory rate limit is per process, not a distributed quota or billing cap.
+For a private hosted deployment, set a long random `APP_ACCESS_TOKEN` before exposing a configured model endpoint to other people. The separate approved public Groq demo mode below deliberately does not use this token. In the site's **Settings > MVP Connection**, enter only that app token, not the provider key. The app token stays in the current tab's session storage. A non-loopback local server refuses to start without the token. Use HTTPS for any remote deployment. This is a personal demonstration gate, not a multi-user authentication system. The in-memory rate limit is per process, not a distributed quota or billing cap.
 
 ## Vercel deployment
 
 `vercel.json` builds the Vite frontend and routes API calls through `api/index.mjs`. The hosted adapter defaults to disconnected API mode, so it does not try the server's localhost as if it were a visitor's laptop. Deploy this as a **new project**, not over the original site.
 
-For a real hosted model, add `AI_MODE`, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` and `APP_ACCESS_TOKEN` in that new project's server environment and redeploy. Do not add `VITE_` before secret variable names. Model requests have a 55-second hosted deadline. No backend database is required. Hosting limits, provider availability and costs must be checked before activation; this repo does not authorize spending or contest submission.
+For a private hosted model, add `AI_MODE`, `AI_BASE_URL`, `AI_MODEL`, `AI_API_KEY` and `APP_ACCESS_TOKEN` in that new project's server environment and redeploy. For the approved open Groq demo, use the public-mode settings below instead. Do not add `VITE_` before secret variable names. Model requests have a 55-second hosted deadline. No backend database is required. Hosting limits, provider availability and costs must be checked before activation; this repo does not authorize spending or contest submission.
 
 ## Check the build
 
