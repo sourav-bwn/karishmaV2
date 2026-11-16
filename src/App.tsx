@@ -2439,6 +2439,7 @@ function App() {
                     alt="Karishma Robot"
                     className="w-full h-full object-cover object-top scale-125 translate-y-0.5"
                   />
+                  <svg className="avs w-full h-full scale-125 translate-y-0.5" viewBox="0 0 368 446" preserveAspectRatio="xMidYMin slice" aria-hidden="true"><g transform="translate(210 164) rotate(-12.8)"><ellipse className="eye" cx="-47" cy="0" rx="19" ry="26" /><ellipse className="eye" cx="47" cy="0" rx="19" ry="26" /></g></svg>
                 </div>
                 <div><b>Karishma AI</b><small>Your AI Companion</small></div>
               </div>
@@ -2722,6 +2723,7 @@ function App() {
                                     alt="Karishma"
                                     className="w-full h-full object-cover object-top scale-125"
                                   />
+                                  <svg className="avs" viewBox="0 0 368 446" preserveAspectRatio="xMidYMin slice" aria-hidden="true"><g transform="translate(210 164) rotate(-12.8)"><ellipse className="eye" cx="-47" cy="0" rx="19" ry="26" /><ellipse className="eye" cx="47" cy="0" rx="19" ry="26" /></g></svg>
                                 </div>
                               )}
                               <div style={isUser ? { maxWidth: "100%" } : { flex: 1, minWidth: 0 }}>
