@@ -431,7 +431,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
           </div>
           <div>
             <b>Connected Accounts</b>
-            <span>Google, GitHub, and other sign-in methods</span>
+            <span>Google sign-in. Other providers are unavailable.</span>
           </div>
           <ChevronRight className="ch" />
         </div>
@@ -1105,7 +1105,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({
               Sign Out
             </h2>
             <p className="kmodal-desc">
-              Are you sure you want to sign out of Karishma AI? Your conversations remain safely stored in cloud backup.
+              Are you sure you want to sign out of Karishma AI? Your conversations and notes stay in this browser, not in a cloud backup.
             </p>
 
             <div style={{ display: "flex", gap: 10 }}>

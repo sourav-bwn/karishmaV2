@@ -13,7 +13,8 @@
     "start": "node --env-file-if-exists=.env server.mjs",
     "test": "node --test",
     "check": "tsc --noEmit && node --check server.mjs",
-    "test:browser": "node scripts/verify-browser.mjs"
+    "test:browser": "node scripts/verify-browser.mjs",
+    "test:auth": "node scripts/verify-auth-browser.mjs"
   },
   "dependencies": {
     "lucide-react": "0.546.0",

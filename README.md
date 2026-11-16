@@ -64,6 +64,7 @@ npm run check
 npm test
 npm run build
 npm run test:browser
+npm run test:auth
 ```
 
 The browser check requires an installed Chrome/Chromium executable. Default on Linux is `/usr/bin/google-chrome`; set `CHROME_PATH` to your executable on another machine. It launches a temporary loopback server with a mocked AI transport. It does not call a real model or use provider credentials. Screenshots go to `/tmp` by default; set `ARTIFACT_DIR` to an existing folder on Windows. Visual comparison uses the supplied current UI, not the archive's older cream README screenshots. The build may warn about the large original frontend chunk; this is a performance warning, not a build failure.
@@ -93,3 +94,5 @@ Groq terms allow end-user applications subject to its agreement, acceptable-use 
 Set server-only `GOOGLE_CLIENT_ID` and `AUTH_SESSION_SECRET` (a long random secret). Add the exact deployed origin to that Google web OAuth client. Google verifies the account and this server checks the token audience, expiry and verified email. A signed 30-day HttpOnly, SameSite=Lax cookie restores the session; HTTPS deployments mark it Secure. Google bearer tokens are not saved in browser storage. Logout clears this browser's cookie, not Google itself or sessions on other devices. This stateless demo has no server-side session revocation database.
 
 History and memory are kept in separate browser-local namespaces for guest and Google accounts. This is separation within this browser, not encrypted cloud storage or a backup. `/privacy.html` explains the data flow.
+
+The auth browser check uses a local mock Google identity and verifies cookie flags, both auth entry points, reload, logout, invalid-cookie rejection and guest/account history separation. It is not a live Google end-to-end proof.

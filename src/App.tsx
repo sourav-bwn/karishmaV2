@@ -64,6 +64,7 @@ import {
 import { SelfHealingStatusModal } from "./components/SelfHealingStatusModal";
 import {
   subscribeToUserConversations,
+  getCleanUserId,
   saveConversationToCloud,
   deleteConversationFromCloud,
   syncAllLocalSessionsToCloud,
@@ -1759,32 +1760,17 @@ function App() {
     // Load initial local cache for THIS active user or guest
     const initialLocal = loadLocalUserChats(loggedInUser, isGuest);
 
-    // Handle initial mount vs switching accounts
-    if (prevUserKeyRef.current !== null && prevUserKeyRef.current !== userAccountKey) {
-      // User switched from Account A to Account B
+    // On both initial load and account switches, restore only that identity's cache.
+    if (prevUserKeyRef.current !== userAccountKey) {
       prevUserKeyRef.current = userAccountKey;
-      setChatHistoryList([]);
-      setMessages([]);
-      const freshId = crypto.randomUUID();
-      setCurrentChatId(freshId);
-      lastSavedSigRef.current = "";
-      if (activeChatIdKey) safeLocalStorageSet(activeChatIdKey, freshId);
-    } else if (prevUserKeyRef.current === null) {
-      // Initial component mount
-      prevUserKeyRef.current = userAccountKey;
-      if (initialLocal.length > 0) {
-        setChatHistoryList(initialLocal);
-        const savedActiveChatId = activeChatIdKey ? safeLocalStorageGet(activeChatIdKey) : null;
-        const matched = savedActiveChatId ? initialLocal.find(s => s.id === savedActiveChatId) : null;
-        const targetSession = matched || initialLocal[0];
-        if (targetSession) {
-          setCurrentChatId(targetSession.id);
-          const sig = `${targetSession.id}:${(targetSession.messages || []).length}:${targetSession.messages?.[targetSession.messages.length - 1]?.id || ""}:${targetSession.messages?.[targetSession.messages.length - 1]?.text || ""}`;
-          lastSavedSigRef.current = sig;
-          setMessages(targetSession.messages || []);
-          if (activeChatIdKey) safeLocalStorageSet(activeChatIdKey, targetSession.id);
-        }
-      }
+      setChatHistoryList(initialLocal);
+      const savedId = activeChatIdKey ? safeLocalStorageGet(activeChatIdKey) : null;
+      const target = initialLocal.find(s => s.id === savedId) || initialLocal[0];
+      const nextId = target?.id || crypto.randomUUID();
+      setCurrentChatId(nextId);
+      setMessages(target?.messages || []);
+      lastSavedSigRef.current = target ? `${target.id}:${target.messages.length}:${target.messages.at(-1)?.id || ""}:${target.messages.at(-1)?.text || ""}` : "";
+      if (activeChatIdKey) safeLocalStorageSet(activeChatIdKey, nextId);
     } else if (initialLocal.length > 0) {
       setChatHistoryList(initialLocal);
     }
@@ -2322,7 +2308,7 @@ function App() {
     localStorage.removeItem("best_friend_saved_chats");
     localStorage.removeItem("best_friend_chat_history");
     sessionStorage.removeItem("best_friend_chat_history");
-    for (const key of Object.keys(localStorage)) { if (key.startsWith("best_friend_saved_chats") || key.startsWith("best_friend_active_chat_id") || key.startsWith("best_friend_sync_queue") || key.startsWith("karishma_mvp_history_") || key === memoryStorageKey()) localStorage.removeItem(key); }
+    for (const key of [getUserStorageKey("best_friend_saved_chats", loggedInUser, isGuest), getUserStorageKey("best_friend_active_chat_id", loggedInUser, isGuest), getUserStorageKey("best_friend_sync_queue", loggedInUser, isGuest), "karishma_mvp_history_" + getCleanUserId(loggedInUser), memoryStorageKey()]) { if (key) localStorage.removeItem(key); }
     localStorage.removeItem("best_friend_user_name");
     setUserName("");
     setShowClearConfirm(false);
