@@ -77,3 +77,13 @@ Setup references:
 - https://docs.ollama.com/api/openai-compatibility
 - https://vercel.com/docs/functions/runtimes/node-js
 - https://vercel.com/docs/project-configuration#rewrites
+
+## Approved public Groq demo mode
+
+`PUBLIC_DEMO=true` explicitly permits visitors to chat without an app token, only when `AI_BASE_URL=https://api.groq.com/openai/v1`. Set `AI_MODE=openai`, `AI_MODEL=openai/gpt-oss-20b`, and a dedicated `AI_API_KEY` as a server secret. Do not set `APP_ACCESS_TOKEN` for this open demo. There is no client-side shared secret. Gemini fallback is not connected or automatically enabled.
+
+The UI shows a Groq privacy/limits notice. Chat, recent context, and enabled memory notes go to Groq; local history and notes remain unencrypted in the visitor's browser. Do not enter personal, sensitive or confidential data. Groq's Free plan is limited, not unlimited. Current account limits verified November 16, 2026: 30 requests/minute, 1,000/day, 8,000 tokens/minute and 200,000/day, shared with the account's other projects. Limits can change.
+
+Public mode caps each new message at 2,000 characters, combined messages+memory at 10,000 characters, output at 600 tokens, and per-process traffic at 5 requests/IP/minute, 15 requests/minute, 150 requests/24h and 2 concurrent requests. These in-memory limits reset on a cold start and are NOT a distributed quota, authentication system, or spending cap. The verified provider Free plan is the billing backstop: never upgrade or add a payment method without separate approval. Provider 429 returns an honest wait message, never a paid fallback. Public traffic can exhaust quota and make the demo unavailable.
+
+Groq terms allow end-user applications subject to its agreement, acceptable-use policy and model terms. Account holder must be 18+. This prototype is not medical or professional advice and does not offer safety-critical guarantees. Sources: https://console.groq.com/docs/legal/services-agreement , https://console.groq.com/docs/your-data , https://console.groq.com/docs/rate-limits .
