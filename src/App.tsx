@@ -3788,16 +3788,6 @@ function App() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-5 space-y-8">
-              <section className="bg-white border border-[#EBE6DD] rounded-2xl p-4 space-y-3">
-                <h3 className="font-bold text-sm">MVP Connection</h3>
-                <p className="text-xs">{connectionInfo}</p>
-                <p className="text-xs">Provider API keys belong only in the server .env file, never here. A hosted provider may charge money. No paid provider has been activated.</p>
-                <label className="text-xs block">App access token (only if the server owner configured one)
-                  <input type="password" autoComplete="off" className="w-full p-3 mt-2 rounded-xl border" value={accessToken} onChange={e=>setAccessToken(e.target.value)} />
-                </label>
-                <button className="px-4 py-2 rounded-xl bg-[#D96B43] text-white text-xs" onClick={()=>{ sessionStorage.setItem("karishma_mvp_access_token",accessToken.trim()); uiToast("App token saved for this tab only. This is not a provider API key."); }}>Save app token</button>
-              </section>
-
               {/* CATEGORY: Appearance */}
               <div className="space-y-4">
                 <h3 className="text-xs font-bold text-[#8C857E] uppercase tracking-wider mb-2 flex items-center gap-2">
