@@ -1,3 +1,7 @@
+.top .search{min-width:0;flex:1 1 0}
+.top .search input{min-width:0;width:100%}
+.top>:not(.search):not(.sp){flex:none}
+@media(max-width:1500px){.top .search kbd{display:none}}
 /*
 
  * Karishma claymorphic UI — ported from "ui for karishma/karishma Ai 4.html".
