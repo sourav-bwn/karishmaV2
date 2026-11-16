@@ -112,21 +112,17 @@ export function AgentsPage({ onSendToChat, onToast }: AgentsPageProps) {
     "creative-muse": true,
   });
 
-  const toggleAgent = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveAgentStatus((prev) => {
-      const next = !prev[id];
-      onToast?.(next ? `Agent activated` : `Agent paused`);
-      return { ...prev, [id]: next };
-    });
+  // Coming-soon preview: every card, tab and toggle stays visible but nothing activates.
+  const [soonKey, setSoonKey] = useState<string | null>(null);
+  const showSoon = (key: string) => {
+    setSoonKey(key);
+    window.setTimeout(() => setSoonKey((k) => (k === key ? null : k)), 1600);
   };
 
-  const filtered = AGENTS_LIST.filter(
-    (a) => filterCategory === "all" || a.category === filterCategory
-  );
+  const filtered = AGENTS_LIST;
 
   return (
-    <section className="mp tp">
+    <section className="mp tp agents-soon">
       {/* Floating Cloud Backdrops */}
       <div className="cloud mp-cl mp-c1" />
       <div className="cloud mp-cl mp-c2" />
@@ -141,11 +137,11 @@ export function AgentsPage({ onSendToChat, onToast }: AgentsPageProps) {
             <h1>
               Autonomous Agents <Sparkles className="i tp-sparkle-inline" />
             </h1>
-            <p>Deploy specialized multi-step AI agents that research, code, write and organize for you.</p>
+            <p>Autonomous agents are coming soon. This is a preview of what is planned.</p>
           </div>
         </div>
         <div className="self-center md:self-auto flex items-center pr-2">
-          <KarishmaMascot size="compact" className="compact" greeting="My agents are ready! 🤖✨" />
+          <KarishmaMascot size="compact" className="compact" greeting="Agents are coming soon!" />
         </div>
       </header>
 
@@ -161,10 +157,14 @@ export function AgentsPage({ onSendToChat, onToast }: AgentsPageProps) {
           ].map(([id, label]) => (
             <button
               key={id}
-              className={`tp-filter-btn ${filterCategory === id ? "active" : ""}`}
-              onClick={() => setFilterCategory(id)}
+              type="button"
+              aria-disabled="true"
+              title="Coming soon"
+              className={`tp-filter-btn soon-item ${soonKey === "tab-" + id ? "show-soon" : ""}`}
+              data-soon="Coming soon"
+              onClick={() => showSoon("tab-" + id)}
             >
-              {label}
+              <span className="soon-x" aria-hidden="true">✕</span> {label}
             </button>
           ))}
         </div>
@@ -173,8 +173,10 @@ export function AgentsPage({ onSendToChat, onToast }: AgentsPageProps) {
       {/* Section Header */}
       <h2 className="mp-sec mp-rise" style={{ "--i": 2 } as React.CSSProperties}>
         <Cpu className="i" />
-        Active Fleet ({filtered.length})
+        Planned agents ({filtered.length})
       </h2>
+
+      <p className="soon-note mp-rise" style={{ "--i": 2 } as React.CSSProperties}>✕ Coming soon - not available yet. Descriptions below are planned, not live.</p>
 
       {/* Grid of Agents */}
       <div className="mp-g">
@@ -183,18 +185,20 @@ export function AgentsPage({ onSendToChat, onToast }: AgentsPageProps) {
           return (
             <button
               key={agent.id}
-              className="mp-c mp-rise"
+              type="button"
+              aria-disabled="true"
+              title="Coming soon"
+              className={`mp-c mp-rise soon-item ${soonKey === agent.id ? "show-soon" : ""}`}
+              data-soon="Coming soon"
               style={{ "--i": i + 3 } as React.CSSProperties}
-              onClick={() => setSelectedAgent(agent)}
+              onClick={() => showSoon(agent.id)}
             >
               <span className="mp-ic" style={{ background: agent.color }}>
                 <Bot className="i" />
               </span>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-                  <span className={`tp-card-tag ${isActive ? "active" : ""}`}>
-                    {isActive ? "● Online" : "○ Standby"}
-                  </span>
+                  <span className="tp-card-tag">✕ Coming soon</span>
                   <span className="tp-card-highlight">{agent.category}</span>
                 </div>
                 <b>{agent.name}</b>
@@ -202,9 +206,8 @@ export function AgentsPage({ onSendToChat, onToast }: AgentsPageProps) {
               </div>
               <div
                 style={{ marginLeft: "auto", display: "flex", alignItems: "center" }}
-                onClick={(e) => toggleAgent(agent.id, e)}
               >
-                <div className={`mp-tog ${isActive ? "" : "off"}`} style={{ scale: "0.85" }}>
+                <div className="mp-tog off" style={{ scale: "0.85" }}>
                   <span />
                 </div>
               </div>
