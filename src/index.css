@@ -1,0 +1,166 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Base colors follow the claymorphic theme variables from karishma-ui.css
+   (fallbacks cover the very first paint). */
+body {
+  background-color: var(--bg, #ffeef6);
+  color: var(--ink, #2b1038);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background-color: var(--lav, #fcc9e6);
+  color: var(--ink, #2b1038);
+}
+
+.markdown-body p:not(:last-child) {
+  margin-bottom: 0.75em;
+}
+
+.markdown-body ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.markdown-body ol {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+.markdown-body li {
+  margin-bottom: 0.25em;
+}
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.markdown-body img {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+/* ================= LEGACY PALETTE REMAP =================
+ * The redesign (karishma-ui.css) re-themed the main shell, but the overlay
+ * panels, auth and onboarding screens still use the old cream/orange Tailwind
+ * utilities. Rather than rewriting their markup, these selectors remap the old
+ * arbitrary colors onto the claymorphic theme variables, so everything follows
+ * data-theme (light/dark) and data-color (pink/blue) automatically.
+ */
+
+/* Full-screen legacy pages get the radial backdrop instead of a flat fill */
+.min-h-screen.bg-\[\#FAF8F5\] {
+  background: radial-gradient(900px 500px at 15% 0, var(--bg2), var(--bg)) !important;
+}
+
+/* Surfaces */
+.bg-\[\#FAF8F5\], .bg-\[\#FCFAF7\], .bg-\[\#F9F0EB\], .bg-\[\#F3EFE9\], .bg-white {
+  background-color: var(--sf) !important;
+}
+.bg-\[\#FAF0E6\], .bg-\[\#FAF0E6\]\/50, .bg-\[\#F3D9C9\],
+.bg-\[\#EBE6DD\], .bg-\[\#EBE6DD\]\/50, .bg-\[\#E2DCD3\], .bg-\[\#DFD9D0\] {
+  background-color: var(--lav) !important;
+}
+
+/* Accent (orange) fills become the brand gradient; hovers deepen it */
+.bg-\[\#D96B43\], .bg-\[\#C85C34\], .bg-\[\#C25A34\] {
+  background: var(--btn) !important;
+  color: #fff !important;
+}
+.hover\:bg-\[\#C85C34\]:hover, .hover\:bg-\[\#C25A34\]:hover {
+  background: var(--pd) !important;
+}
+
+/* Ink */
+.text-\[\#2C2A29\] { color: var(--ink) !important; }
+.text-\[\#5C5753\], .text-\[\#8C857E\], .text-\[\#B3ABA3\] { color: var(--mute) !important; }
+.text-\[\#D96B43\], .text-\[\#C85C34\], .text-\[\#C25A34\] { color: var(--pd) !important; }
+.text-\[\#EBE6DD\] { color: #fff !important; }
+.hover\:text-\[\#D96B43\]:hover, .hover\:text-\[\#C85C34\]:hover,
+.group-hover\:text-\[\#D96B43\]:hover {
+  color: var(--pd) !important;
+}
+.hover\:text-\[\#2C2A29\]:hover { color: var(--ink) !important; }
+
+/* Borders */
+.border-\[\#EBE6DD\], .border-\[\#DFD9D0\], .border-\[\#E2DCD3\],
+.border-\[\#F3D9C9\], .border-\[\#FAF8F5\] {
+  border-color: var(--lav) !important;
+}
+.border-\[\#D96B43\] { border-color: var(--pd) !important; }
+.border-\[\#D96B43\]\/30 { border-color: color-mix(in srgb, var(--pd) 30%, transparent) !important; }
+.border-\[\#D96B43\]\/50 { border-color: color-mix(in srgb, var(--pd) 50%, transparent) !important; }
+.hover\:border-\[\#D96B43\]:hover { border-color: var(--pd) !important; }
+.hover\:border-\[\#D96B43\]\/30:hover { border-color: color-mix(in srgb, var(--pd) 30%, transparent) !important; }
+.hover\:border-\[\#8C857E\]:hover { border-color: var(--mute) !important; }
+
+/* Hover surfaces */
+.hover\:bg-\[\#FAF8F5\]:hover, .hover\:bg-\[\#F3EFE9\]:hover { background-color: var(--sf2) !important; }
+.hover\:bg-\[\#FAF0E6\]:hover, .hover\:bg-\[\#E2DCD3\]:hover,
+.hover\:bg-\[\#EBE6DD\]\/50:hover {
+  background-color: var(--lav) !important;
+}
+
+/* Focus rings take the theme glow */
+.ring-\[\#D96B43\] { --tw-ring-color: var(--glow) !important; }
+.focus\:ring-\[\#D96B43\]:focus { --tw-ring-color: var(--glow) !important; }
+
+
+/* ============ ANDROID (CAPACITOR) SHELL ONLY ============ *
+ * Scoped to html.capacitor-native, which src/lib/native.ts adds only when the
+ * app is running inside the APK. The browser version is untouched.
+ *
+ * These rules do not restyle anything -- they only keep the existing layout out
+ * from under the status bar / navigation bar. Under edge-to-edge the env()
+ * values report the real insets; if Android lays the WebView out below the
+ * system bars instead, every env() resolves to 0px and these rules do nothing.
+ */
+
+html.capacitor-native,
+html.capacitor-native body {
+  height: 100%;
+  /* Kill overscroll glow/bounce so the app doesn't feel like a web page. */
+  overscroll-behavior-y: none;
+}
+
+html.capacitor-native #root {
+  height: 100%;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* The app root uses `h-screen h-dvh` (chat) or `min-h-screen` (onboarding).
+ * Both are viewport-relative, which would ignore the safe-area padding above,
+ * so inside the shell they fill the padded #root instead. */
+html.capacitor-native #root > * {
+  height: 100%;
+  min-height: 100%;
+}
+
+/* Long-press text selection and the blue tap highlight are browser habits that
+ * look out of place on a native chat surface. Inputs keep normal behaviour. */
+html.capacitor-native {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html.capacitor-native button,
+html.capacitor-native [role='button'] {
+  -webkit-touch-callout: none;
+}
+
+
+
+

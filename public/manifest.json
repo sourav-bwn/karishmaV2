@@ -1,0 +1,16 @@
+{
+  "short_name": "Karishma",
+  "name": "Karishma AI Assistant",
+  "icons": [
+    {
+      "src": "/karishma-mascot.webp",
+      "sizes": "any",
+      "type": "image/webp"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait"
+}
