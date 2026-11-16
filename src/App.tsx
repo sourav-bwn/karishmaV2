@@ -759,9 +759,10 @@ function App() {
 
   // Model state
   const [selectedModel, setSelectedModel] = useState("server-configured model");
+  const [publicDemo, setPublicDemo] = useState(false);
   const [accessToken, setAccessToken] = useState(() => sessionStorage.getItem("karishma_mvp_access_token") || "");
   const [connectionInfo, setConnectionInfo] = useState("Checking server configuration...");
-  useEffect(() => { fetch("/api/config").then(r=>r.json()).then(c=>{ setSelectedModel(c.model || "not configured"); setConnectionInfo(`${c.mode}: ${c.model || "no model"}. ${c.configured ? "Configured, not yet verified by a real reply." : "No model configured."} Browser-only storage, no cloud account.`); }).catch(()=>setConnectionInfo("Backend unavailable. Build the app and run npm start.")); }, []);
+  useEffect(() => { fetch("/api/config").then(r=>r.json()).then(c=>{ setPublicDemo(Boolean(c.publicDemo)); setSelectedModel(c.model || "not configured"); setConnectionInfo(`${c.mode}: ${c.model || "no model"}. ${c.configured ? "Configured, not yet verified by a real reply." : "No model configured."} Browser-only storage, no cloud account.`); }).catch(()=>setConnectionInfo("Backend unavailable. Build the app and run npm start.")); }, []);
 
 
   // Attachment state
@@ -2750,6 +2751,7 @@ function App() {
                   />
                 ) : (
                   <>
+                    {activeView === "Chat" && publicDemo && <p className="mx-3 my-2 rounded-xl border border-purple-200 bg-white/70 px-3 py-2 text-xs text-purple-900" role="note">Free public AI demo, powered by Groq. Messages, recent chat and enabled memory notes go to Groq. History and notes stay unencrypted in this browser. Do not enter personal, sensitive or confidential data. AI can be wrong. Shared limits may pause replies. No Gemini backup is connected. <a href="https://console.groq.com/docs/your-data" target="_blank" rel="noreferrer" className="underline">Provider privacy</a></p>}
                     {activeView === "Chat" && messages.length === 0 && (
                       <div className="hero">
                         <KarishmaMascot userName={userName} />
@@ -4210,4 +4212,4 @@ export default function AppWithErrorBoundary() {
       
     </ErrorBoundary>
   );
-}
+         }
