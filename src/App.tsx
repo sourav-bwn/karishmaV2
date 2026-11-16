@@ -79,7 +79,6 @@ import { MemoryPage } from "./components/MemoryPage";
 import { ToolsPage } from "./components/ToolsPage";
 import { AgentsPage } from "./components/AgentsPage";
 import { StudioPage } from "./components/StudioPage";
-import { FilesPage } from "./components/FilesPage";
 import { ProjectsPage } from "./components/ProjectsPage";
 import { ExplorePage } from "./components/ExplorePage";
 import { AttachmentPreview } from "./components/AttachmentPreview";
@@ -771,7 +770,7 @@ function App() {
   // Mockup v5 draws .mem on .main and .vmem on body while the Memory view is up
   useEffect(() => {
     document.body.classList.toggle("vmem", activeView === "Memory");
-    document.body.classList.toggle("vtools", activeView === "Tools" || activeView === "Agents" || activeView === "Studio" || activeView === "Files" || activeView === "Projects" || activeView === "Explore");
+    document.body.classList.toggle("vtools", activeView === "Tools" || activeView === "Agents" || activeView === "Studio" || activeView === "Projects" || activeView === "Explore");
     return () => {
       document.body.classList.remove("vmem");
       document.body.classList.remove("vtools");
@@ -796,7 +795,7 @@ function App() {
 
   // Smooth recolor for theme/color flips (mockup swap() helper)
   useEffect(() => {
-    if (["Agents", "Studio", "Files", "Projects", "Tools", "Explore"].includes(activeView)) uiToast("Original UI preview: this screen contains sample content. Chat and Memory are the working MVP features.");
+    if (["Agents", "Studio", "Projects", "Tools", "Explore"].includes(activeView)) uiToast("Original UI preview: this screen contains sample content. Chat and Memory are the working MVP features.");
   }, [activeView]);
 
   const swapUi = (fn: () => void) => {
@@ -2447,7 +2446,7 @@ function App() {
                 <Plus className="i" /><span className="lbl">New Chat</span>
               </button>
               <nav className="knav">
-                {NAV_ITEMS.map((item, idx) => {
+                {NAV_ITEMS.filter((item) => item.view !== "Files").map((item, idx) => {
                   const label = item.panel === "history" ? "Memory" : item.panel === "settings" ? "Settings" : item.view;
                   const isActive = !item.panel && activeView === item.view;
                   const Icon = item.icon;
@@ -2978,20 +2977,6 @@ function App() {
                   />
                 )}
 
-                {/* Files page */}
-                {!showAccount && activeView === "Files" && (
-                  <FilesPage
-                    onSendToChat={(prompt) => {
-                      setUserInput(prompt);
-                      setActiveView("Chat");
-                      setTimeout(() => {
-                        chatInputRef.current?.focus();
-                      }, 100);
-                    }}
-                    onToast={uiToast}
-                  />
-                )}
-
                 {/* Projects page */}
                 {!showAccount && activeView === "Projects" && (
                   <ProjectsPage
@@ -3310,9 +3295,6 @@ function App() {
               </button>
               <button onClick={() => { setShowAccount(false); setShowHistoryPanel(true); }}>
                 <Smile className="i" />Memory
-              </button>
-              <button className={activeView === "Files" && !showAccount ? "on" : ""} onClick={() => { setShowAccount(false); setActiveView("Files"); }}>
-                <Folder className="i" />Files
               </button>
               <button className={showAccount ? "on" : ""} onClick={() => setShowAccount(true)}>
                 <User className="i" />Account
@@ -4071,4 +4053,4 @@ export default function AppWithErrorBoundary() {
       
     </ErrorBoundary>
   );
-         }
+        }
