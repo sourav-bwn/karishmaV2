@@ -1,4 +1,5 @@
 import http from 'node:http';
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +21,9 @@ export function configuration(env = process.env) {
   const publicDemo = env.PUBLIC_DEMO === 'true';
   if (publicDemo && base !== 'https://api.groq.com/openai/v1') throw new Error('Public demo currently supports only the approved Groq endpoint.');
   const ready = Boolean(base && model && (mode === 'ollama' || env.AI_API_KEY));
-  return { publicDemo, mode, base, model, ready, key: env.AI_API_KEY || '', token: env.APP_ACCESS_TOKEN || '', host: env.HOST || '127.0.0.1', port: Number(env.PORT) || 3000 };
+  const googleClientId = (env.GOOGLE_CLIENT_ID || '').trim();
+  const sessionSecret = (env.AUTH_SESSION_SECRET || '').trim();
+  return { publicDemo, mode, base, model, ready, key: env.AI_API_KEY || '', token: env.APP_ACCESS_TOKEN || '', host: env.HOST || '127.0.0.1', port: Number(env.PORT) || 3000, googleClientId, sessionSecret };
 }
 
 export function validateChat(body) {
@@ -41,6 +44,59 @@ export function buildMessages({ messages, memory }) {
 }
 
 function json(res, status, data) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); }
+
+// Stateless signed sessions for Google sign-in. The token carries only the
+// verified Google profile; the HMAC signature stops tampering, and the server
+// keeps no account database.
+function signSession(payload, secret) {
+  const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const sig = crypto.createHmac('sha256', secret).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+function verifySessionToken(token, secret) {
+  if (typeof token !== 'string' || token.length > 4096 || !secret) return null;
+  const dot = token.lastIndexOf('.');
+  if (dot <= 0) return null;
+  const body = token.slice(0, dot);
+  const sig = Buffer.from(token.slice(dot + 1), 'utf8');
+  const expect = Buffer.from(crypto.createHmac('sha256', secret).update(body).digest('base64url'), 'utf8');
+  if (sig.length !== expect.length || !crypto.timingSafeEqual(sig, expect)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    if (!payload || typeof payload.sub !== 'string' || typeof payload.exp !== 'number' || payload.exp * 1000 < Date.now()) return null;
+    return payload;
+  } catch { return null; }
+}
+async function fetchJson(fetchImpl, url, options) {
+  try {
+    const res = await fetchImpl(url, options);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+// Verify a Google ID token or access token with Google and return the verified
+// profile, or null. The audience must be this app's own OAuth client.
+async function verifyGoogleCredential(fetchImpl, { credential, accessToken }, clientId) {
+  if (typeof credential === 'string' && credential.split('.').length === 3 && credential.length <= 4096) {
+    const data = await fetchJson(fetchImpl, 'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(credential));
+    if (!data || data.aud !== clientId || !['accounts.google.com', 'https://accounts.google.com'].includes(data.iss)) return null;
+    if (!data.sub || String(data.email_verified) !== 'true' || Number(data.exp) * 1000 <= Date.now()) return null;
+    return data;
+  }
+  const token = (typeof accessToken === 'string' && accessToken) || (typeof credential === 'string' ? credential : '');
+  if (!token || token.length > 2048) return null;
+  const info = await fetchJson(fetchImpl, 'https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(token));
+  if (!info || info.aud !== clientId || !info.sub || Number(info.expires_in) <= 0) return null;
+  const profile = await fetchJson(fetchImpl, 'https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + token } });
+  if (!profile || !profile.sub || profile.sub !== info.sub) return null;
+  if (String(profile.email_verified) !== 'true') return null;
+  return profile;
+}
+function googleUser(profile) {
+  const fullName = typeof profile.name === 'string' ? profile.name : '';
+  const nickname = (typeof profile.given_name === 'string' && profile.given_name) || fullName.split(' ')[0] || '';
+  return { id: 'google_' + profile.sub, email: profile.email || '', fullName, nickname, avatar: profile.picture || '', provider: 'google' };
+}
 async function readBody(req) {
   if (req.body !== undefined) { const text = typeof req.body === 'string' ? req.body : JSON.stringify(req.body); if (Buffer.byteLength(text) > MAX_BYTES) { const e = new Error('Request too large.'); e.status = 413; throw e; } return typeof req.body === 'string' ? JSON.parse(req.body) : req.body; }
   let bytes = 0, chunks = [];
@@ -50,6 +106,7 @@ async function readBody(req) {
 
 export function createApp({ config = configuration(), fetchImpl = fetch } = {}) {
   const buckets = new Map();
+  const authBuckets = new Map();
   let activeRequests = 0;
   let minute = { count: 0, until: 0 };
   let day = { count: 0, until: 0 };
@@ -58,11 +115,43 @@ export function createApp({ config = configuration(), fetchImpl = fetch } = {}) 
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; media-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://accounts.google.com https://www.googleapis.com https://oauth2.googleapis.com; frame-src https://accounts.google.com; media-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     try {
       const url = new URL(req.url, 'http://localhost');
       if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { status: 'ok', storage: 'browser-only', aiConfigured: config.ready });
-      if (req.method === 'GET' && url.pathname === '/api/auth/config') return json(res, 200, { googleEnabled: false, githubEnabled: false, googleClientId: '' });
+      if (req.method === 'GET' && url.pathname === '/api/auth/config') return json(res, 200, { googleEnabled: Boolean(config.googleClientId && config.sessionSecret), githubEnabled: false, googleClientId: config.googleClientId || '' });
+      if (url.pathname.startsWith('/api/auth/') && req.method === 'POST') {
+        const origin = req.headers.origin;
+        if (origin && new URL(origin).host !== req.headers.host) return json(res, 403, { error: 'Cross-origin sign-in refused.' });
+      }
+      const secure = req.headers['x-forwarded-proto'] === 'https' || Boolean(req.socket.encrypted);
+      const cookie = (value, age) => `karishma_session=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${age}${secure ? '; Secure' : ''}`;
+      if (req.method === 'POST' && url.pathname === '/api/auth/logout') {
+        res.setHeader('Set-Cookie', cookie('', 0));
+        return json(res, 200, { success: true });
+      }
+      if (req.method === 'POST' && (url.pathname === '/api/auth/google' || url.pathname === '/api/auth/me')) {
+        const now = Date.now();
+        const authIp = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+        const authBucket = authBuckets.get(authIp) || { count: 0, until: now + 60000 };
+        if (authBucket.until < now) { authBucket.count = 0; authBucket.until = now + 60000; }
+        if (++authBucket.count > 20) { authBuckets.set(authIp, authBucket); return json(res, 429, { error: 'Too many sign-in attempts. Please wait a minute and try again.' }); }
+        authBuckets.set(authIp, authBucket);
+        if (!config.googleClientId || !config.sessionSecret) return json(res, 503, { error: 'Google sign-in is not configured on this server yet.' });
+        const body = await readBody(req);
+        if (url.pathname === '/api/auth/google') {
+          const profile = await verifyGoogleCredential(fetchImpl, { credential: body?.credential, accessToken: body?.accessToken }, config.googleClientId);
+          if (!profile) return json(res, 401, { error: 'Google could not verify that sign-in. Please try again.' });
+          const user = googleUser(profile);
+          const token = signSession({ sub: user.id, email: user.email, name: user.fullName, picture: user.avatar, iat: Math.floor(now / 1000), exp: Math.floor(now / 1000) + 30 * 86400 }, config.sessionSecret);
+          res.setHeader('Set-Cookie', cookie(token, 30 * 86400));
+          return json(res, 200, { success: true, user });
+        }
+        const token = String(req.headers.cookie || '').split(';').map(c => c.trim()).find(c => c.startsWith('karishma_session='))?.slice(17);
+        const payload = verifySessionToken(token, config.sessionSecret);
+        if (!payload) return json(res, 401, { success: false, error: 'Session expired. Please sign in again.' });
+        return json(res, 200, { success: true, user: googleUser({ sub: payload.sub.slice(7), email: payload.email, name: payload.name, picture: payload.picture }) });
+      }
       if (req.method === 'GET' && url.pathname === '/api/models') return json(res, 200, { model: config.model, mode: config.mode });
       if (url.pathname.startsWith('/api/auth/')) return json(res, 501, { error: 'Accounts are not included in this MVP. Use Continue as guest. Your data stays in this browser.' });
       if (req.method === 'GET' && url.pathname === '/api/config') return json(res, 200, { mode: config.mode, model: config.model, configured: config.ready, protected: Boolean(config.token), publicDemo: Boolean(config.publicDemo), provider: providerName, memory: 'browser-only' });

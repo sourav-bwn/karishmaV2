@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Markdown from "react-markdown";
+import { readNotes, memoryStorageKey } from "./lib/memory";
 
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -405,18 +406,8 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
-  const [loggedInUser, setLoggedInUser] = useState<{ id?: string, fullName?: string, nickname?: string, name?: string, email: string, avatarUrl?: string } | null>(() => {
-    try {
-      const saved = localStorage.getItem("mock_logged_in_user");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return parsed;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  });
+  const [loggedInUser, setLoggedInUser] = useState<{ id?: string, fullName?: string, nickname?: string, name?: string, email: string, avatarUrl?: string } | null>(null);
+  const [sessionChecking, setSessionChecking] = useState(true);
 
   // Mandatory Authentication step state
   //
@@ -424,12 +415,7 @@ function App() {
   // wrappers rather than raw localStorage: a throw inside a useState initializer
   // (private mode, WebView with storage disabled) would abort the very first
   // render and blank the whole app, not just the auth screen.
-  const [authCompleted, setAuthCompleted] = useState(() => {
-    const savedUser = safeLocalStorageGet("mock_logged_in_user");
-    const isGuestFlag = safeLocalStorageGet("best_friend_is_guest") === "true";
-    const authCompletedFlag = safeLocalStorageGet("auth_step_completed") === "true";
-    return Boolean(savedUser) || isGuestFlag || authCompletedFlag;
-  });
+  const [authCompleted, setAuthCompleted] = useState(() => safeLocalStorageGet("best_friend_is_guest") === "true");
   const [isGuest, setIsGuest] = useState(() => {
     return safeLocalStorageGet("best_friend_is_guest") === "true";
   });
@@ -437,8 +423,8 @@ function App() {
   // Shared sign-in completion. Exchanges a backend session ({user, token}) for
   // the same localStorage state the password login used to write, so the rest
   // of the app (per-user storage keys, cloud history load) needs no changes.
-  const applyAuthSuccess = useCallback((data: { user: any; token: string }) => {
-    const userData = { ...data.user, token: data.token };
+  const applyAuthSuccess = useCallback((data: { user: any; token?: string }) => {
+    const userData = { ...data.user };
     localStorage.setItem("mock_logged_in_user", JSON.stringify(userData));
     localStorage.setItem("best_friend_is_guest", "false");
     localStorage.setItem("auth_step_completed", "true");
@@ -462,6 +448,26 @@ function App() {
     setChatHistoryList([]);
     setMessages([]);
     setCurrentChatId(crypto.randomUUID());
+  }, []);
+
+  // Only a server-verified HttpOnly cookie restores a signed-in account.
+  // The local profile cache is display data, never proof of authentication.
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    fetch("/api/auth/me", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", signal: controller.signal })
+      .then(async res => {
+        if (!res.ok) { safeLocalStorageRemove("mock_logged_in_user"); return; }
+        const data = await res.json();
+        if (data.success && data.user) {
+          safeLocalStorageSet("mock_logged_in_user", JSON.stringify(data.user));
+          safeLocalStorageSet("best_friend_is_guest", "false");
+          setLoggedInUser(data.user); setIsGuest(false); setAuthCompleted(true);
+        }
+      })
+      .catch(() => { safeLocalStorageRemove("mock_logged_in_user"); })
+      .finally(() => { clearTimeout(timer); setSessionChecking(false); });
+    return () => { clearTimeout(timer); controller.abort(); };
   }, []);
 
   // Google Sign-In: the ID token from GIS (web) or the native plugin (APK) is
@@ -492,57 +498,12 @@ function App() {
         );
       }
       if (!res.ok) throw new Error(data?.error || "Google sign-in failed.");
-      if (!data.success || !data.user || !data.token) throw new Error("Unexpected sign-in response.");
+      if (!data.success || !data.user) throw new Error("Unexpected sign-in response.");
       applyAuthSuccess({ user: data.user, token: data.token });
     } catch (err: any) {
       setAuthError(err.message || "Google sign-in failed.");
     } finally {
       setAuthLoading(false);
-    }
-  }, [applyAuthSuccess]);
-
-  // Listen for popup auth messages (e.g. GitHub OAuth completion)
-  useEffect(() => {
-    const handleAuthMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === "GITHUB_AUTH_SUCCESS") {
-        if (event.data.user && event.data.token) {
-          applyAuthSuccess({ user: event.data.user, token: event.data.token });
-        }
-      } else if (event.data?.type === "GITHUB_AUTH_ERROR") {
-        setAuthError(event.data.error || "GitHub sign-in failed.");
-      }
-    };
-    window.addEventListener("message", handleAuthMessage);
-    return () => window.removeEventListener("message", handleAuthMessage);
-  }, [applyAuthSuccess]);
-
-  // Handle OAuth redirects if popup was blocked or unavailable
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get("token");
-    const userId = params.get("userId");
-    const authErrorParam = params.get("auth_error");
-
-    if (authErrorParam) {
-      setAuthError(decodeURIComponent(authErrorParam));
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (token && userId) {
-      fetch("/api/auth/me", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, token }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.user) {
-            applyAuthSuccess({ user: data.user, token });
-          }
-        })
-        .catch(() => { })
-        .finally(() => {
-          window.history.replaceState({}, document.title, window.location.pathname);
-        });
     }
   }, [applyAuthSuccess]);
 
@@ -572,7 +533,7 @@ function App() {
   }, []);
 
   const handlePasswordLogin = useCallback(async (identifier: string, password: string) => {
-    setAuthError("Guest-only MVP: use Continue as Guest. Account login is not connected."); return;
+    setAuthError("Use the Google button to sign in. Email/password login is not available."); return;
     setAuthLoading(true);
     setAuthError("");
     try {
@@ -704,41 +665,6 @@ function App() {
       localStorage.setItem("best_friend_user_name", conversationalName);
     }
   }, [loggedInUser?.id, loggedInUser?.nickname, loggedInUser?.fullName, loggedInUser?.email]);
-
-  // Fetch latest profile on mount
-  useEffect(() => {
-    const fetchProfile = async () => {
-      const savedUserStr = localStorage.getItem("mock_logged_in_user");
-      if (!savedUserStr) return;
-      try {
-        const saved = JSON.parse(savedUserStr);
-        if (saved?.id) {
-          const res = await fetch("/api/auth/me", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ userId: saved.id, token: saved.token || "legacy" })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.success && data.user) {
-              const updatedUser = { ...data.user, token: saved.token };
-              if (
-                data.user.nickname !== saved.nickname ||
-                data.user.fullName !== saved.fullName ||
-                data.user.email !== saved.email
-              ) {
-                setLoggedInUser(updatedUser);
-                localStorage.setItem("mock_logged_in_user", JSON.stringify(updatedUser));
-              }
-            }
-          }
-        }
-      } catch (err) {
-        // Graceful offline fallback - preserve existing stored user without breaking UI
-      }
-    };
-    fetchProfile();
-  }, []);
 
   // Chat History & Real-Time Sync state
   const [currentChatId, setCurrentChatId] = useState<string>(() => crypto.randomUUID());
@@ -1218,22 +1144,11 @@ function App() {
   }, []);
 
   // Complete Privacy & Account Data Cleanup on Logout
-  const handleLogout = useCallback(() => {
-    // Best-effort: revoke the server-side session token BEFORE the local purge
-    // wipes the credentials this call needs. Fire-and-forget: offline logout
-    // still completes locally, and the token expires from the server's list
-    // (max 10 sessions) either way.
+  const handleLogout = useCallback(async () => {
     try {
-      const saved = JSON.parse(localStorage.getItem("mock_logged_in_user") || "null");
-      if (saved?.id && saved?.token) {
-        fetch("/api/auth/logout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: saved.id, token: saved.token }),
-          keepalive: true,
-        }).catch(() => { });
-      }
-    } catch { }
+      const result = await fetch("/api/auth/logout", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}", keepalive: true });
+      if (!result.ok) throw new Error();
+    } catch { setAuthError("Could not sign out. Reconnect and try again."); alert("Could not sign out. Reconnect and try again."); return; }
 
     // Best-effort: also end the OS-level Google session on the APK so the
     // next sign-in re-shows the account picker instead of silently reusing it.
@@ -1301,40 +1216,8 @@ function App() {
     setPendingSyncQueue([]);
     setSyncStatus("synced");
 
-    // 8. Purge device cache (localStorage & sessionStorage) for account privacy
-    try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key) {
-          // Keep non-account UI preferences & onboarding flag
-          if (
-            key === "best_friend_theme" ||
-            key === "best_friend_selected_model" ||
-            key === "best_friend_response_mode" ||
-            key === "onboarding_completed"
-          ) {
-            continue;
-          }
-          if (
-            key.startsWith("best_friend_") ||
-            key.startsWith("user_") ||
-            key.startsWith("chat_") ||
-            key.startsWith("memory_") ||
-            key.startsWith("context_") ||
-            key.startsWith("karishma_mvp_") ||
-            key === "mock_logged_in_user" ||
-            key === "auth_step_completed"
-          ) {
-            keysToRemove.push(key);
-          }
-        }
-      }
-      keysToRemove.forEach((k) => localStorage.removeItem(k));
-      sessionStorage.clear();
-    } catch (e) {
-      console.error("Error purging local device cache on logout:", e);
-    }
+    // Keep per-account and guest browser data, but remove active identity.
+    for (const key of ["mock_logged_in_user", "auth_step_completed", "best_friend_is_guest", "best_friend_user_name", "best_friend_nickname", "best_friend_full_name"]) safeLocalStorageRemove(key);
 
     // 9. Present clean logged-out welcome state
     setMessages([
@@ -2439,7 +2322,7 @@ function App() {
     localStorage.removeItem("best_friend_saved_chats");
     localStorage.removeItem("best_friend_chat_history");
     sessionStorage.removeItem("best_friend_chat_history");
-    for (const key of Object.keys(localStorage)) { if (key.startsWith("best_friend_saved_chats") || key.startsWith("best_friend_active_chat_id") || key.startsWith("best_friend_sync_queue") || key.startsWith("karishma_mvp_history_") || key === "karishma_mvp_memory_notes") localStorage.removeItem(key); }
+    for (const key of Object.keys(localStorage)) { if (key.startsWith("best_friend_saved_chats") || key.startsWith("best_friend_active_chat_id") || key.startsWith("best_friend_sync_queue") || key.startsWith("karishma_mvp_history_") || key === memoryStorageKey()) localStorage.removeItem(key); }
     localStorage.removeItem("best_friend_user_name");
     setUserName("");
     setShowClearConfirm(false);
@@ -2450,7 +2333,7 @@ function App() {
     const dataBundle = {
       app: "karishmaV2", timestamp: new Date().toISOString(), storage: "This browser only. Export is not encrypted.",
       chats: chatHistoryList, currentConversation: messages,
-      memory: JSON.parse(localStorage.getItem("karishma_mvp_memory_notes") || "[]")
+      memory: readNotes()
     };
 
     const blob = new Blob([JSON.stringify(dataBundle, null, 2)], { type: "application/json" });
@@ -2462,6 +2345,8 @@ function App() {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (sessionChecking) return <div className="auth" role="status">Checking your session...</div>;
 
   if (!authCompleted) {
     return (

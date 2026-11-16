@@ -36,3 +36,48 @@ test('public mode requires approved Groq endpoint and explicit flag',()=>{assert
 test('public demo works without a client secret, caps output, refuses long input',async()=>withServer(async base=>{let r=await fetch(base+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(chat)});assert.equal(r.status,200);r=await fetch(base+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:'x'.repeat(2001)}]})});assert.equal(r.status,400);},{config:publicConfig,fetchImpl:async(_u,o)=>{assert.equal(JSON.parse(o.body).max_tokens,600);return Response.json({choices:[{message:{content:'Mock reply'}}]});}}));
 test('public demo stops sixth request per IP and preserves cross-origin block',async()=>withServer(async base=>{for(let i=0;i<6;i++){const r=await fetch(base+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(chat)});assert.equal(r.status,i===5?429:200);}const r=await fetch(base+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json',Origin:'https://evil.invalid'},body:JSON.stringify(chat)});assert.equal(r.status,403);},{config:publicConfig,fetchImpl:async()=>Response.json({choices:[{message:{content:'Mock reply'}}]})}));
 test('provider 429 is honest quota wait, not leaked body or paid fallback',async()=>withServer(async base=>{const r=await fetch(base+'/api/chat',{method:'POST',headers,body:JSON.stringify(chat)});assert.equal(r.status,429);assert.match((await r.json()).error,/No paid fallback/);},{fetchImpl:async()=>new Response('sensitive',{status:429})}));
+
+const authConfig = { ...baseConfig, googleClientId: 'test-client-id', sessionSecret: 'test-session-secret' };
+const googleProfile = { sub: '123', aud: 'test-client-id', iss: 'accounts.google.com', email: 'a@example.com', email_verified: 'true', exp: Math.floor(Date.now()/1000)+3600, name: 'Test User', picture: 'https://example.invalid/p.png' };
+const googleFetch = async (url, opts) => {
+  if (String(url).includes('tokeninfo?id_token=')) return Response.json(googleProfile);
+  if (String(url).includes('tokeninfo?access_token=')) return Response.json({ sub: '123', aud: 'test-client-id', expires_in: 3600 });
+  if (String(url).includes('userinfo')) { if (opts?.headers?.Authorization !== 'Bearer good-token') return new Response('bad', { status: 401 }); return Response.json(googleProfile); }
+  throw new Error('unexpected fetch ' + url);
+};
+test('google sign-in verifies token with Google and issues a checked session', async () => withServer(async base => {
+  const res = await fetch(base + '/api/auth/google', { method: 'POST', headers, body: JSON.stringify({ accessToken: 'good-token' }) });
+  assert.equal(res.status, 200);
+  const cookie = res.headers.get('set-cookie');
+  assert.match(cookie, /HttpOnly; SameSite=Lax; Max-Age=2592000/);
+  const data = await res.json();
+  assert.equal(data.token, undefined);
+  assert.equal(data.success, true);
+  assert.equal(data.user.id, 'google_123');
+  assert.equal(data.user.email, 'a@example.com');
+  assert.match(await (await fetch(base + '/api/auth/config')).text(), /test-client-id/);
+  assert.doesNotMatch(await (await fetch(base + '/api/config')).text(), /test-session-secret/);
+  const me = await fetch(base + '/api/auth/me', { method: 'POST', headers: {...headers, Cookie: cookie.split(';')[0]}, body: '{}'  });
+  assert.equal(me.status, 200);
+  const bad = await fetch(base + '/api/auth/me', { method: 'POST', headers, body: '{}'  });
+  assert.equal(bad.status, 401);
+  const logout = await fetch(base + '/api/auth/logout', {method:'POST'});
+  assert.match(logout.headers.get('set-cookie'), /Max-Age=0/);
+}, { config: authConfig, fetchImpl: googleFetch }));
+test('google sign-in refuses tokens for another app and id tokens with wrong audience', async () => withServer(async base => {
+  const badAud = await fetch(base + '/api/auth/google', { method: 'POST', headers, body: JSON.stringify({ accessToken: 'good-token' }) });
+  assert.equal(badAud.status, 401);
+}, { config: authConfig, fetchImpl: async url => {
+  if (String(url).includes('tokeninfo?access_token=')) return Response.json({ sub: '123', aud: 'someone-else' });
+  return Response.json(googleProfile);
+} }));
+test('google sign-in accepts a verified ID token and reports unconfigured honestly', async () => withServer(async base => {
+  const res = await fetch(base + '/api/auth/google', { method: 'POST', headers, body: JSON.stringify({ credential: 'aaa.bbb.ccc' }) });
+  assert.equal(res.status, 200);
+}, { config: authConfig, fetchImpl: googleFetch }));
+test('auth endpoints say not configured when Google env is missing', async () => withServer(async base => {
+  const res = await fetch(base + '/api/auth/google', { method: 'POST', headers, body: JSON.stringify({ accessToken: 'x' }) });
+  assert.equal(res.status, 503);
+  const cfg = await (await fetch(base + '/api/auth/config')).json();
+  assert.equal(cfg.googleEnabled, false);
+}));

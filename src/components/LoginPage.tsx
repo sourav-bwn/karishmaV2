@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { FLORAL_DATA_URI } from "../assets/loginFloralBase64";
 import {
+  prepareGoogleSignIn,
   isNativePlatform,
   nativeGoogleIdToken,
   promptGoogleSignIn,
@@ -47,6 +48,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   isDark,
   onToggleTheme,
 }) => {
+  useEffect(() => { prepareGoogleSignIn().catch(() => {}); }, []);
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [transitionClass, setTransitionClass] = useState<"" | "out" | "in">("");
   const [isSwitching, setIsSwitching] = useState(false);
@@ -184,23 +186,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     );
   };
 
+  // GitHub, Discord and Microsoft are not connected yet; the cross badge on
+  // each button shows they are currently not available.
+  const unavailable = (provider: string) => () =>
+    notify(`${provider} sign-in is currently not available`);
   const handleGithub = () => {
-    if (onGithubAuth) {
-      onGithubAuth();
-      return;
-    }
-    const width = 600;
-    const height = 700;
-    const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
-    const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
-    const popup = window.open(
-      "/api/auth/github",
-      "github-auth-popup",
-      `width=${width},height=${height},left=${left},top=${top},status=no,toolbar=no,menubar=no`
-    );
-    if (!popup || popup.closed || typeof popup.closed === "undefined") {
-      window.location.href = "/api/auth/github";
-    }
+    unavailable("GitHub")();
   };
 
   const handleToggleColor = () => {
@@ -590,6 +581,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             data-s="Google"
             aria-label="Google"
             onClick={handleGoogle}
+            disabled={authLoading}
           >
             <svg viewBox="0 0 24 24">
               <path
@@ -611,12 +603,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </svg>
           </button>
           <button
-            className="rb"
+            className="rb rb-na"
             type="button"
             data-s="GitHub"
-            aria-label="GitHub"
+            aria-label="GitHub (currently not available)"
+            title="Currently not available"
             onClick={handleGithub}
           >
+            <span className="rbx" aria-hidden="true">
+              ✕
+            </span>
             <svg viewBox="0 0 24 24">
               <path
                 fill="#111"
@@ -625,12 +621,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </svg>
           </button>
           <button
-            className="rb"
+            className="rb rb-na"
             type="button"
             data-s="Discord"
-            aria-label="Discord"
-            onClick={() => notify("Discord sign-in coming soon")}
+            aria-label="Discord (currently not available)"
+            title="Currently not available"
+            onClick={unavailable("Discord")}
           >
+            <span className="rbx" aria-hidden="true">
+              ✕
+            </span>
             <svg viewBox="0 0 24 24">
               <path
                 fill="#5865F2"
@@ -639,12 +639,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({
             </svg>
           </button>
           <button
-            className="rb"
+            className="rb rb-na"
             type="button"
             data-s="Microsoft"
-            aria-label="Microsoft"
-            onClick={() => notify("Microsoft sign-in coming soon")}
+            aria-label="Microsoft (currently not available)"
+            title="Currently not available"
+            onClick={unavailable("Microsoft")}
           >
+            <span className="rbx" aria-hidden="true">
+              ✕
+            </span>
             <svg viewBox="0 0 24 24">
               <path fill="#F25022" d="M1 1h10.5v10.5H1z" />
               <path fill="#7FBA00" d="M12.5 1H23v10.5H12.5z" />

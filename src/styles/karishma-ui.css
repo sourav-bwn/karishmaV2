@@ -2308,3 +2308,30 @@ nav.knav button:hover{background:var(--lav)}nav.knav button.on{background:var(--
 .kshell .mvp-memory-editor textarea:focus {outline:2px solid var(--p);outline-offset:2px;}
 .kshell .mvp-memory-editor .tp-choice-btn {background:var(--sf);border:1px solid var(--lav);border-radius:12px;box-shadow:var(--c2);font-size:12px;font-weight:800;color:var(--ink);}
 .kshell .mvp-memory-editor .mvp-memory-entry {padding:16px;border:1px solid var(--lav);border-radius:18px;background:var(--sf2);box-shadow:none;}
+/* Social buttons that are currently not available keep their place and icon,
+   but dim and carry a small red cross badge. */
+.asoc .rb-na {
+  position: relative;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.asoc .rb-na:hover {
+  transform: none;
+}
+.asoc .rb-na .rbx {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #e5484d;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
