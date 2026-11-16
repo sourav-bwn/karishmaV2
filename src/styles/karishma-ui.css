@@ -2339,3 +2339,8 @@ nav.knav button:hover{background:var(--lav)}nav.knav button.on{background:var(--
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   pointer-events: none;
 }
+
+/* Small robot avatars: draw the glowing eyes over the blank visor (the full-body image has none) */
+.avs{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.ka .avs{transform:scale(1.35)}
+.avs ellipse{fill:#f6edff;filter:drop-shadow(0 0 1.5px #c58bff) drop-shadow(0 0 3px #8f3dff)}
