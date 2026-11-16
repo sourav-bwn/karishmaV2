@@ -12,6 +12,7 @@ import {
   Sliders,
   Layers,
   Wand2,
+  X,
 } from "lucide-react";
 import { ButterflySwarm } from "./ButterflySwarm";
 import { KarishmaMascot } from "./KarishmaMascot";
@@ -145,15 +146,16 @@ export function StudioPage({ onSendToChat, onToast }: StudioPageProps) {
       {/* Grid of Studio Cards */}
       <div className="mp-g">
         {filtered.map((item, i) => (
-          <button
+          <div
             key={item.id}
-            className="mp-c mp-rise"
+            className="mp-c mp-rise studio-locked-card"
             style={{ "--i": i + 3 } as React.CSSProperties}
-            onClick={() => {
-              setSelectedPreset(item);
-              setCustomIdea("");
-            }}
+            role="group"
+            aria-label={`${item.title}: Coming soon`}
+            aria-disabled="true"
+            title="Coming soon"
           >
+            <div className="studio-locked-card-content" inert aria-hidden="true">
             <span className="mp-ic" style={{ background: item.badgeColor }}>
               <Palette className="i" />
             </span>
@@ -164,7 +166,13 @@ export function StudioPage({ onSendToChat, onToast }: StudioPageProps) {
               <b>{item.title}</b>
               <span className="t">{item.desc}</span>
             </div>
-          </button>
+            </div>
+            <div className="studio-card-overlay" aria-hidden="true">
+              <span className="studio-card-cross"><X strokeWidth={2.5} /></span>
+              <span className="studio-card-label">Coming soon</span>
+              <span className="studio-card-tooltip">Coming soon</span>
+            </div>
+          </div>
         ))}
       </div>
 
