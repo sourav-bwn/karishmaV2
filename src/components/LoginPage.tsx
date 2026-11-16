@@ -528,11 +528,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                   </a>{" "}
                   and{" "}
                   <a
-                    href="#privacy"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      notify("Terms & Privacy page coming soon");
-                    }}
+                    href="/privacy.html"
+                    target="_blank"
+                    rel="noreferrer"
                   >
                     Privacy Policy
                   </a>

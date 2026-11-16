@@ -80,13 +80,13 @@ async function verifyGoogleCredential(fetchImpl, { credential, accessToken }, cl
   if (typeof credential === 'string' && credential.split('.').length === 3 && credential.length <= 4096) {
     const data = await fetchJson(fetchImpl, 'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(credential));
     if (!data || data.aud !== clientId || !['accounts.google.com', 'https://accounts.google.com'].includes(data.iss)) return null;
-    if (!data.sub || String(data.email_verified) !== 'true' || Number(data.exp) * 1000 <= Date.now()) return null;
+    if (!data.sub || String(data.email_verified) !== 'true' || !Number.isFinite(Number(data.exp)) || Number(data.exp) * 1000 <= Date.now()) return null;
     return data;
   }
   const token = (typeof accessToken === 'string' && accessToken) || (typeof credential === 'string' ? credential : '');
   if (!token || token.length > 2048) return null;
   const info = await fetchJson(fetchImpl, 'https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(token));
-  if (!info || info.aud !== clientId || !info.sub || Number(info.expires_in) <= 0) return null;
+  if (!info || info.aud !== clientId || !info.sub || !Number.isFinite(Number(info.expires_in)) || Number(info.expires_in) <= 0) return null;
   const profile = await fetchJson(fetchImpl, 'https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + token } });
   if (!profile || !profile.sub || profile.sub !== info.sub) return null;
   if (String(profile.email_verified) !== 'true') return null;
