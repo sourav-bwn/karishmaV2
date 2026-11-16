@@ -2,7 +2,7 @@ name: Import verified MVP snapshot
 on:
   push:
     branches: [main]
-    paths: [karishmaV2-snapshot.zip]
+    paths: [1-karishmaV2-snapshot.zip, .github/workflows/import-snapshot.yml]
 permissions:
   contents: write
 jobs:
@@ -15,13 +15,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          printf '%s  %s\n' '5f40001b4c3e82fe06ee1ea752ffb152ec57ae025d8bedd66e6170f8aa9751e8' 'karishmaV2-snapshot.zip' | sha256sum -c -
-          unzip -q karishmaV2-snapshot.zip -d /tmp/verified-mvp
+          printf '%s  %s\n' '5f40001b4c3e82fe06ee1ea752ffb152ec57ae025d8bedd66e6170f8aa9751e8' '1-karishmaV2-snapshot.zip' | sha256sum -c -
+          unzip -q 1-karishmaV2-snapshot.zip -d /tmp/verified-mvp
           test -f /tmp/verified-mvp/karishmaV2/package-lock.json
           test ! -e /tmp/verified-mvp/karishmaV2/.git
           test ! -e /tmp/verified-mvp/karishmaV2/.env
           cp -a /tmp/verified-mvp/karishmaV2/. .
-          rm karishmaV2-snapshot.zip
+          rm 1-karishmaV2-snapshot.zip
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add .
