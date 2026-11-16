@@ -2344,3 +2344,14 @@ nav.knav button:hover{background:var(--lav)}nav.knav button.on{background:var(--
 .avs{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .ka .avs{transform:scale(1.35)}
 .avs ellipse{fill:#f6edff;filter:drop-shadow(0 0 1.5px #c58bff) drop-shadow(0 0 3px #8f3dff)}
+
+
+/* Each Studio preset is unavailable; navigation, header and filters stay normal. */
+.studio-locked-card{position:relative;isolation:isolate;overflow:hidden;cursor:not-allowed;min-height:174px}
+.studio-locked-card-content{display:flex;align-items:center;gap:16px;width:100%;pointer-events:none;user-select:none}
+.studio-card-overlay{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px;background:rgba(15,10,24,.78);color:#fff;border-radius:inherit}
+.studio-card-cross{display:grid;place-items:center;width:38px;height:38px;border:1px solid rgba(255,255,255,.75);border-radius:50%;background:rgba(255,255,255,.08)}
+.studio-card-cross svg{width:24px;height:24px}
+.studio-card-label{display:block;padding:6px 16px;border-radius:999px;background:#fff;color:#382547;font-size:17px;font-weight:900;line-height:1.3;white-space:nowrap}
+.studio-card-tooltip{position:absolute;bottom:8px;padding:3px 9px;border-radius:7px;background:#20152d;color:#fff;font-size:11px;opacity:0;transition:opacity .15s}
+@media(hover:hover){.studio-locked-card:hover .studio-card-tooltip{opacity:1}.studio-locked-card:hover .studio-card-overlay{background:rgba(15,10,24,.85)}}
