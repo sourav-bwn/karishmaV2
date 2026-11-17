@@ -2383,3 +2383,9 @@ nav.knav button:hover{background:var(--lav)}nav.knav button.on{background:var(--
 .agents-soon .soon-note{margin:4px 0 8px;font-weight:700;color:var(--pd)}
 .agents-soon .soon-item .mp-tog{filter:grayscale(1);opacity:.5}
 .agents-soon .mp-c.soon-item{padding-top:22px}
+
+/* Interface text (chat bubbles, side panels, cards, buttons, labels) is not
+   selectable; editable fields stay selectable. Message Copy buttons use the
+   clipboard API and are unaffected. */
+*{user-select:none;-webkit-user-select:none}
+input,textarea,[contenteditable]{user-select:text;-webkit-user-select:text}
