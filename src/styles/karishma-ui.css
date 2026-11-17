@@ -264,7 +264,15 @@ nav.knav button:hover{background:var(--lav)}nav.knav button.on{background:var(--
 
 
 
-.plant{position:absolute;right:0;bottom:0;width:70px;z-index:1}
+.stage-wrap{flex:1;display:flex;flex-direction:column;position:relative;min-height:0}
+
+.plant{position:absolute;right:4px;bottom:4px;width:70px;z-index:1;pointer-events:none}
+
+.plant .drop{opacity:0;animation:plantDrop 3.4s ease-in infinite}
+.plant .drop.d2{animation-delay:1.2s;animation-duration:3.8s}
+.plant .drop.d3{animation-delay:2.3s;animation-duration:3.1s}
+.plant .d1{--fall:20px}.plant .d2{--fall:18px}.plant .d3{--fall:24px}
+@keyframes plantDrop{0%{transform:translateY(0);opacity:0}15%{opacity:.9}70%{opacity:.9}100%{transform:translateY(var(--fall,20px));opacity:0}}
 
 
 
