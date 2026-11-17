@@ -918,7 +918,7 @@ function App() {
     if (stored && SPEECH_LANGUAGES.some(l => l.code === stored)) {
       return stored;
     }
-    return "bn-IN";
+    return "en-IN";
   });
   const [isListening, setIsListening] = useState<boolean>(false);
   const [speechError, setSpeechError] = useState<string | null>(null);
