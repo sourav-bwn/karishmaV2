@@ -2389,3 +2389,23 @@ nav.knav button:hover{background:var(--lav)}nav.knav button.on{background:var(--
    clipboard API and are unaffected. */
 *{user-select:none;-webkit-user-select:none}
 input,textarea,[contenteditable]{user-select:text;-webkit-user-select:text}
+/* Weather card, light theme only: Tailwind dark: variants follow the OS setting,
+   not data-theme, so a dark OS with the light app theme gave grey tiles and pale text. */
+[data-theme=light] .exp-weather-card .dark\:text-white{color:#1c1917!important}
+[data-theme=light] .exp-weather-card .dark\:text-stone-300{color:#44403c!important}
+[data-theme=light] .exp-weather-card .dark\:text-stone-400,
+[data-theme=light] .exp-weather-card .dark\:text-stone-500,
+[data-theme=light] .exp-weather-card .text-stone-500,
+[data-theme=light] .exp-weather-card .text-stone-400{color:#57534e!important}
+[data-theme=light] .exp-weather-card .dark\:text-purple-300,
+[data-theme=light] .exp-weather-card .dark\:text-purple-400{color:#7e22ce!important}
+[data-theme=light] .exp-weather-card .dark\:text-emerald-400{color:#047857!important}
+[data-theme=light] .exp-weather-card .dark\:text-amber-400{color:#b45309!important}
+[data-theme=light] .exp-weather-card .dark\:bg-stone-800\/40,
+[data-theme=light] .exp-weather-card .dark\:bg-stone-800\/50{background-color:rgba(255,255,255,.75)!important}
+[data-theme=light] .exp-weather-card .dark\:bg-stone-700\/60{background-color:rgba(255,255,255,.9)!important}
+[data-theme=light] .exp-weather-card .dark\:border-purple-900\/30{border-color:rgba(168,85,247,.3)!important}
+[data-theme=light] .exp-weather-card .dark\:border-stone-700\/60{border-color:rgba(120,113,108,.35)!important}
+[data-theme=light] .exp-weather-card .text-\[10px\]{font-size:11px!important}
+[data-theme=light] .exp-weather-card .text-\[11px\]{font-size:12px!important}
+[data-theme=light] .exp-weather-card .text-xs{color:#292524}
