@@ -2648,7 +2648,8 @@ function App() {
                 </button>
               </div>
 
-              <div className="stage">
+              <div className="stage-wrap">
+                <div className="stage">
                 {showAccount ? (
                   <AccountPage
                     user={loggedInUser}
@@ -2915,13 +2916,6 @@ function App() {
                       </div>
                     )}
 
-                    <svg className="plant" viewBox="0 0 70 90">
-                      <path d="M35 54C30 38 12 34 8 18c14-2 26 6 27 36Z" fill="#8fc57d" />
-                      <path d="M35 54c4-16 20-20 26-34-14-2-27 8-26 34Z" fill="#a8d894" />
-                      <path d="M35 54c-2-16 4-30 8-40-10 6-13 24-8 40Z" fill="#7bb36a" />
-                      <path d="M14 58h44l-5 26c-1 4-4 6-8 6H27c-4 0-7-2-8-6Z" style={{ fill: "var(--b3)" }} />
-                      <rect x="11" y="52" width="50" height="10" rx="5" fill="#c9aaff" />
-                    </svg>
                   </>
                 )}
 
@@ -3002,6 +2996,20 @@ function App() {
                     }}
                     onToast={uiToast}
                   />
+                )}
+                </div>
+
+                {!showAccount && activeView === "Chat" && (
+                  <svg className="plant" viewBox="0 0 70 90">
+                    <path d="M35 54C30 38 12 34 8 18c14-2 26 6 27 36Z" fill="#8fc57d" />
+                    <path d="M35 54c4-16 20-20 26-34-14-2-27 8-26 34Z" fill="#a8d894" />
+                    <path d="M35 54c-2-16 4-30 8-40-10 6-13 24-8 40Z" fill="#7bb36a" />
+                    <path d="M14 58h44l-5 26c-1 4-4 6-8 6H27c-4 0-7-2-8-6Z" style={{ fill: "var(--b3)" }} />
+                    <rect x="11" y="52" width="50" height="10" rx="5" fill="#c9aaff" />
+                    <ellipse className="drop d1" cx="14" cy="34" rx="1.7" ry="2.6" fill="#8fd0ff" />
+                    <ellipse className="drop d2" cx="56" cy="36" rx="1.5" ry="2.3" fill="#8fd0ff" />
+                    <ellipse className="drop d3" cx="44" cy="30" rx="1.4" ry="2.1" fill="#a5dcff" />
+                  </svg>
                 )}
               </div>
 
