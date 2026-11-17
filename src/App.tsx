@@ -319,7 +319,6 @@ export const SPEECH_LANGUAGES: SpeechLanguageOption[] = [
   { code: "bn-IN", label: "Bengali (India)", native: "বাংলা (ভারত)", flag: "🇮🇳" },
   { code: "en-IN", label: "English (India)", native: "English (India)", flag: "🇮🇳" },
   { code: "hi-IN", label: "Hindi (India)", native: "हिन्दी (भारत)", flag: "🇮🇳" },
-  { code: "en-US", label: "English (US)", native: "English (US)", flag: "🇺🇸" },
 ];
 
 interface Message {
