@@ -38,6 +38,19 @@ import {
 import { ButterflySwarm } from "./ButterflySwarm";
 import { KarishmaMascot } from "./KarishmaMascot";
 import exploreImg from "../assets/images/explore_panoramic_strip.jpg";
+import {
+  fetchLiveWeather,
+  getBrowserPosition,
+  reverseGeocode,
+  searchCities,
+  loadLastLocation,
+  saveLastLocation,
+  aqiCaption,
+  uvCaption,
+  type LiveWeather,
+  type GeoPoint,
+  type CityResult,
+} from "../lib/liveWeather";
 
 /* ------------------------------------------------------------------ *
  * Types
@@ -79,128 +92,6 @@ export interface SongTrack {
   coverGradient: string;
   freqPattern: number[];
 }
-
-export interface WeatherData {
-  city: string;
-  country: string;
-  tempC: number;
-  condition: string;
-  icon: "sun" | "cloud" | "rain";
-  humidity: number;
-  windKm: number;
-  aqi: number;
-  uv: number;
-  sunset: string;
-  advice: string;
-  forecast: { day: string; tempC: number; icon: "sun" | "cloud" | "rain" }[];
-}
-
-/* ------------------------------------------------------------------ *
- * Curated Live Data
- * ------------------------------------------------------------------ */
-
-const WEATHER_CITIES: Record<string, WeatherData> = {
-  Kolkata: {
-    city: "Kolkata",
-    country: "India",
-    tempC: 28,
-    condition: "Tropical Twilight Breeze",
-    icon: "cloud",
-    humidity: 72,
-    windKm: 14,
-    aqi: 58,
-    uv: 4,
-    sunset: "5:18 PM",
-    advice: "Warm, gentle evening in the city of joy. Perfect for a cup of masala chai and brainstorming creative ideas with Karishma! ☕✨",
-    forecast: [
-      { day: "Mon", tempC: 28, icon: "cloud" },
-      { day: "Tue", tempC: 29, icon: "sun" },
-      { day: "Wed", tempC: 27, icon: "rain" },
-      { day: "Thu", tempC: 26, icon: "rain" },
-      { day: "Fri", tempC: 28, icon: "cloud" },
-    ],
-  },
-  Tokyo: {
-    city: "Tokyo",
-    country: "Japan",
-    tempC: 17,
-    condition: "Crisp Starry Evening",
-    icon: "sun",
-    humidity: 48,
-    windKm: 12,
-    aqi: 22,
-    uv: 2,
-    sunset: "4:42 PM",
-    advice: "Clear skies over Shinjuku. Great night for focused coding, synthwave playlists, and quiet reflection. 🗼🌙",
-    forecast: [
-      { day: "Mon", tempC: 17, icon: "sun" },
-      { day: "Tue", tempC: 18, icon: "sun" },
-      { day: "Wed", tempC: 15, icon: "cloud" },
-      { day: "Thu", tempC: 14, icon: "rain" },
-      { day: "Fri", tempC: 16, icon: "sun" },
-    ],
-  },
-  "San Francisco": {
-    city: "San Francisco",
-    country: "USA",
-    tempC: 15,
-    condition: "Mild Bay Fog & Sunshine",
-    icon: "cloud",
-    humidity: 64,
-    windKm: 22,
-    aqi: 28,
-    uv: 3,
-    sunset: "5:04 PM",
-    advice: "Cool coastal breeze rolling in. A warm hoodie and tea will keep you cozy while we automate your tasks! 🌉💜",
-    forecast: [
-      { day: "Mon", tempC: 15, icon: "cloud" },
-      { day: "Tue", tempC: 16, icon: "sun" },
-      { day: "Wed", tempC: 17, icon: "sun" },
-      { day: "Thu", tempC: 15, icon: "cloud" },
-      { day: "Fri", tempC: 14, icon: "rain" },
-    ],
-  },
-  London: {
-    city: "London",
-    country: "UK",
-    tempC: 12,
-    condition: "Gentle Autumn Drizzle",
-    icon: "rain",
-    humidity: 82,
-    windKm: 18,
-    aqi: 32,
-    uv: 1,
-    sunset: "4:22 PM",
-    advice: "Classic misty London drizzle outside. Stay indoors, listen to our lo-fi playlist, and let me summarize your reading list! 🌧️📖",
-    forecast: [
-      { day: "Mon", tempC: 12, icon: "rain" },
-      { day: "Tue", tempC: 11, icon: "rain" },
-      { day: "Wed", tempC: 13, icon: "cloud" },
-      { day: "Thu", tempC: 12, icon: "cloud" },
-      { day: "Fri", tempC: 14, icon: "sun" },
-    ],
-  },
-  "New York": {
-    city: "New York",
-    country: "USA",
-    tempC: 14,
-    condition: "Brisk Manhattan Twilight",
-    icon: "sun",
-    humidity: 52,
-    windKm: 16,
-    aqi: 38,
-    uv: 3,
-    sunset: "4:48 PM",
-    advice: "The city that never sleeps is bustling. Keep your pacing steady and let me keep track of your active projects! 🏙️✨",
-    forecast: [
-      { day: "Mon", tempC: 14, icon: "sun" },
-      { day: "Tue", tempC: 13, icon: "cloud" },
-      { day: "Wed", tempC: 15, icon: "sun" },
-      { day: "Thu", tempC: 11, icon: "rain" },
-      { day: "Fri", tempC: 12, icon: "cloud" },
-    ],
-  },
-};
 
 const TRENDING_NEWS: NewsItem[] = [
   {
@@ -402,8 +293,18 @@ export function ExplorePage({ onSendToChat, onToast }: ExplorePageProps) {
   const [activeTab, setActiveTab] = useState<"all" | "news" | "reels" | "music" | "weather" | "topics">("all");
   const [searchQ, setSearchQ] = useState("");
   const [newsCategory, setNewsCategory] = useState<string>("all");
-  const [selectedCity, setSelectedCity] = useState<string>("Kolkata");
   const [tempUnit, setTempUnit] = useState<"C" | "F">("C");
+
+  // Live weather state: exact location via browser geolocation, real data
+  // from Open-Meteo (free, no API key). Nothing is hardcoded.
+  type WxStatus = "idle" | "locating" | "loading" | "ready" | "denied" | "error";
+  const [wxStatus, setWxStatus] = useState<WxStatus>("idle");
+  const [weather, setWeather] = useState<LiveWeather | null>(null);
+  const [wxError, setWxError] = useState<string>("");
+  const [wxLastKnown, setWxLastKnown] = useState<string>("");
+  const [cityQuery, setCityQuery] = useState("");
+  const [cityResults, setCityResults] = useState<CityResult[]>([]);
+  const wxRunRef = useRef(0);
 
   // Reels interactive viewer state
   const [activeReel, setActiveReel] = useState<ReelItem | null>(null);
@@ -586,8 +487,91 @@ export function ExplorePage({ onSendToChat, onToast }: ExplorePageProps) {
     onToast?.("Comment posted! 💜");
   };
 
-  // Weather data for selected city
-  const weather = WEATHER_CITIES[selectedCity] || WEATHER_CITIES.Kolkata;
+  // Live weather loading helpers
+  const loadWeatherFor = async (p: GeoPoint, placeName: string, persist: boolean) => {
+    const run = ++wxRunRef.current;
+    setWxStatus("loading");
+    setWxError("");
+    try {
+      const w = await fetchLiveWeather(p, placeName);
+      if (run !== wxRunRef.current) return;
+      setWeather(w);
+      setWxStatus("ready");
+      if (persist) saveLastLocation({ ...p, name: placeName });
+    } catch {
+      if (run !== wxRunRef.current) return;
+      setWxStatus("error");
+      setWxError("Could not load live weather right now. Please try again.");
+    }
+  };
+
+  const locateMe = async () => {
+    const run = ++wxRunRef.current;
+    setWxStatus("locating");
+    setWxError("");
+    setWxLastKnown("");
+    try {
+      const p = await getBrowserPosition();
+      const name = await reverseGeocode(p);
+      if (run !== wxRunRef.current) return;
+      await loadWeatherFor(p, name, true);
+    } catch (e: any) {
+      if (run !== wxRunRef.current) return;
+      const denied = e?.code === 1; // GeolocationPositionError.PERMISSION_DENIED
+      // Fallback: last known location stored in this browser, if any.
+      const last = loadLastLocation();
+      if (last) {
+        setWxLastKnown(last.name);
+        setWxStatus(denied ? "denied" : "error");
+        setWxError(
+          denied
+            ? "Location permission is off, so this is your last known location. Allow access or search a city to update."
+            : "Could not get your exact location, so this is your last known location. Try again or search a city."
+        );
+        loadWeatherFor({ lat: last.lat, lon: last.lon }, last.name, false);
+      } else {
+        setWxStatus(denied ? "denied" : "error");
+        setWxError(
+          denied
+            ? "Location permission is off. Allow it in your browser, or search your city below."
+            : "Could not get your exact location. Search your city below."
+        );
+      }
+    }
+  };
+
+  const searchCitySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = cityQuery.trim();
+    if (!q) return;
+    try {
+      const results = await searchCities(q);
+      setCityResults(results);
+      if (results.length === 0) onToast?.("No matching city found. Try a different spelling.");
+      if (results.length === 1) pickCity(results[0]);
+    } catch {
+      setCityResults([]);
+      onToast?.("City search failed - check your connection.");
+    }
+  };
+
+  const pickCity = (c: CityResult) => {
+    setCityResults([]);
+    setCityQuery("");
+    setWxLastKnown("");
+    const name = [c.name, c.admin1, c.country]
+      .filter((s): s is string => !!s)
+      .filter((s, i, arr) => arr.indexOf(s) === i)
+      .join(", ");
+    loadWeatherFor({ lat: c.lat, lon: c.lon }, name, true);
+  };
+
+  // On first view, ask the browser for the user's exact location.
+  useEffect(() => {
+    locateMe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const displayTemp = (tempC: number) => {
     if (tempUnit === "F") {
       return `${Math.round((tempC * 9) / 5 + 32)}°F`;
@@ -747,113 +731,172 @@ export function ExplorePage({ onSendToChat, onToast }: ExplorePageProps) {
             </div>
           </div>
 
-          {/* City Selector Chips */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3">
-            {Object.keys(WEATHER_CITIES).map((cName) => (
+          {/* Location controls: exact geolocation or manual city search */}
+          <div className="flex flex-wrap items-center gap-2 pb-2 mb-1">
+            <button
+              onClick={locateMe}
+              disabled={wxStatus === "locating"}
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border bg-purple-600 text-white border-purple-600 shadow-sm hover:bg-purple-700 disabled:opacity-60 cursor-pointer"
+            >
+              <MapPin className="i inline-block w-3.5 h-3.5 mr-1 -mt-0.5" />
+              {wxStatus === "locating" ? "Locating you..." : "Use my exact location"}
+            </button>
+            <form onSubmit={searchCitySubmit} className="flex items-center gap-2 flex-1 min-w-[220px]">
+              <input
+                value={cityQuery}
+                onChange={(e) => setCityQuery(e.target.value)}
+                placeholder="Or type a city name (e.g. Kolkata)"
+                className="flex-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white/70 dark:bg-stone-800/70 text-stone-700 dark:text-stone-300 border border-stone-200/50 dark:border-stone-700/50 outline-none focus:border-purple-400"
+              />
               <button
-                key={cName}
-                onClick={() => setSelectedCity(cName)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
-                  selectedCity === cName
-                    ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                    : "bg-white/70 dark:bg-stone-800/70 text-stone-700 dark:text-stone-300 border-stone-200/50 dark:border-stone-700/50 hover:bg-white"
-                }`}
+                type="submit"
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white/70 dark:bg-stone-800/70 text-stone-700 dark:text-stone-300 border border-stone-200/50 dark:border-stone-700/50 hover:bg-white cursor-pointer"
               >
-                📍 {cName}
+                Search
               </button>
-            ))}
+            </form>
           </div>
+          {cityResults.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pb-2 mb-1">
+              {cityResults.map((c, i) => (
+                <button
+                  key={i}
+                  onClick={() => pickCity(c)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border bg-white/70 dark:bg-stone-800/70 text-stone-700 dark:text-stone-300 border-stone-200/50 dark:border-stone-700/50 hover:bg-white cursor-pointer"
+                >
+                  📍 {[c.name, c.admin1, c.country].filter(Boolean).join(", ")}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Weather Hero Card */}
           <div className="exp-weather-card">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
-              {/* Main Weather Display */}
-              <div className="flex items-center gap-5">
-                <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-400 to-pink-500 flex items-center justify-center text-white shadow-md flex-shrink-0 animate-pulse">
-                  {weather.icon === "sun" ? (
-                    <Sun className="w-10 h-10" />
-                  ) : weather.icon === "rain" ? (
-                    <CloudRain className="w-10 h-10" />
-                  ) : (
-                    <CloudSun className="w-10 h-10" />
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black text-stone-900 dark:text-white">
-                      {displayTemp(weather.tempC)}
-                    </span>
-                    <span className="text-sm font-semibold text-stone-500 dark:text-stone-400">
-                      {weather.city}, {weather.country}
-                    </span>
+            {wxStatus === "ready" && weather ? (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+                  {/* Main Weather Display */}
+                  <div className="flex items-center gap-5 min-w-0">
+                    <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-400 to-pink-500 flex items-center justify-center text-white shadow-md flex-shrink-0 animate-pulse">
+                      {weather.icon === "sun" ? (
+                        <Sun className="w-10 h-10" />
+                      ) : weather.icon === "rain" ? (
+                        <CloudRain className="w-10 h-10" />
+                      ) : (
+                        <CloudSun className="w-10 h-10" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-4xl font-black text-stone-900 dark:text-white leading-none">
+                        {displayTemp(weather.tempC)}
+                      </div>
+                      <div className="text-sm font-semibold text-stone-500 dark:text-stone-400 mt-1 break-words">
+                        {weather.placeName}
+                      </div>
+                      <div className="text-base font-bold text-purple-700 dark:text-purple-300 mt-0.5">
+                        {weather.condition}
+                      </div>
+                      <div className="text-xs text-stone-500 dark:text-stone-400 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span>💧 Humidity: {weather.humidity}%</span>
+                        <span>💨 Wind: {weather.windKm} km/h</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-base font-bold text-purple-700 dark:text-purple-300 mt-0.5">
-                    {weather.condition}
-                  </div>
-                  <div className="text-xs text-stone-500 dark:text-stone-400 mt-1 flex items-center gap-3">
-                    <span>💧 Humidity: {weather.humidity}%</span>
-                    <span>💨 Wind: {weather.windKm} km/h</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Atmospheric Details Grid */}
-              <div className="grid grid-cols-3 gap-3 text-center border-y lg:border-y-0 lg:border-x border-stone-200/60 dark:border-stone-700/60 py-3 lg:py-0 lg:px-4">
-                <div className="p-2 rounded-2xl bg-white/40 dark:bg-stone-800/40">
-                  <div className="text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-bold">
-                    AQI Air Quality
+                  {/* Atmospheric Details Grid */}
+                  <div className="grid grid-cols-3 gap-3 text-center border-y lg:border-y-0 lg:border-x border-stone-200/60 dark:border-stone-700/60 py-3 lg:py-0 lg:px-4 min-w-0">
+                    <div className="p-2 rounded-2xl bg-white/40 dark:bg-stone-800/40 min-w-0">
+                      <div className="text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-bold">
+                        AQI Air Quality
+                      </div>
+                      <div className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        {weather.aqi == null ? "—" : weather.aqi}
+                      </div>
+                      <div className="text-[10px] text-stone-500 font-medium">{aqiCaption(weather.aqi)}</div>
+                    </div>
+                    <div className="p-2 rounded-2xl bg-white/40 dark:bg-stone-800/40 min-w-0">
+                      <div className="text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-bold">
+                        UV Index
+                      </div>
+                      <div className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">
+                        {weather.uv == null ? "—" : weather.uv}
+                      </div>
+                      <div className="text-[10px] text-stone-500 font-medium">{uvCaption(weather.uv)}</div>
+                    </div>
+                    <div className="p-2 rounded-2xl bg-white/40 dark:bg-stone-800/40 min-w-0">
+                      <div className="text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-bold">
+                        Sunset Time
+                      </div>
+                      <div className="text-lg font-black text-purple-600 dark:text-purple-400 mt-0.5">
+                        {weather.sunset}
+                      </div>
+                      <div className="text-[10px] text-stone-500 font-medium">Golden Hour</div>
+                    </div>
                   </div>
-                  <div className="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-0.5">
-                    {weather.aqi}
-                  </div>
-                  <div className="text-[10px] text-stone-500 font-medium">Healthy • Clean</div>
-                </div>
-                <div className="p-2 rounded-2xl bg-white/40 dark:bg-stone-800/40">
-                  <div className="text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-bold">
-                    UV Index
-                  </div>
-                  <div className="text-lg font-black text-amber-600 dark:text-amber-400 mt-0.5">
-                    {weather.uv}
-                  </div>
-                  <div className="text-[10px] text-stone-500 font-medium">Moderate</div>
-                </div>
-                <div className="p-2 rounded-2xl bg-white/40 dark:bg-stone-800/40">
-                  <div className="text-[11px] uppercase tracking-wider text-stone-500 dark:text-stone-400 font-bold">
-                    Sunset Time
-                  </div>
-                  <div className="text-lg font-black text-purple-600 dark:text-purple-400 mt-0.5">
-                    {weather.sunset}
-                  </div>
-                  <div className="text-[10px] text-stone-500 font-medium">Golden Hour</div>
-                </div>
-              </div>
 
-              {/* Karishma's AI Weather Advice */}
-              <div className="flex flex-col justify-between h-full bg-white/50 dark:bg-stone-800/50 p-4 rounded-2xl border border-purple-200/40 dark:border-purple-900/30">
-                <div className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-medium">
-                  <b>Karishma's Weather Tip:</b>
-                  <p className="mt-1">{weather.advice}</p>
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 text-xs text-stone-500 font-semibold">
-                    {weather.forecast.map((f, i) => (
-                      <span key={i} className="px-1.5 py-0.5 rounded-md bg-white/60 dark:bg-stone-700/60 text-[10px]">
-                        {f.day}: {displayTemp(f.tempC)}
-                      </span>
-                    ))}
+                  {/* Karishma's Weather Advice */}
+                  <div className="flex flex-col justify-between h-full bg-white/50 dark:bg-stone-800/50 p-4 rounded-2xl border border-purple-200/40 dark:border-purple-900/30 min-w-0">
+                    <div className="text-xs text-stone-700 dark:text-stone-300 leading-relaxed font-medium">
+                      <b>Karishma's Weather Tip:</b>
+                      <p className="mt-1">{weather.advice}</p>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-stone-500 font-semibold">
+                        {weather.forecast.map((f, i) => (
+                          <span key={i} className="px-1.5 py-0.5 rounded-md bg-white/60 dark:bg-stone-700/60 text-[10px]">
+                            {f.day}: {displayTemp(f.tempC)}
+                          </span>
+                        ))}
+                      </div>
+                      <button
+                        className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs cursor-pointer flex-shrink-0"
+                        onClick={() => {
+                          onSendToChat?.(`What should I wear and plan today given the weather in ${weather.placeName} (${weather.tempC}°C, ${weather.condition})?`);
+                          onToast?.("Sent weather question to Karishma!");
+                        }}
+                      >
+                        Ask Karishma
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs cursor-pointer flex-shrink-0"
-                    onClick={() => {
-                      onSendToChat?.(`What should I wear and plan today given ${weather.city}'s weather (${weather.tempC}°C, ${weather.condition})?`);
-                      onToast?.("Sent weather question to Karishma!");
-                    }}
-                  >
-                    Ask Karishma
-                  </button>
                 </div>
+                <p className="mt-3 text-[10px] text-stone-400 dark:text-stone-500">
+                  {wxLastKnown
+                    ? `Showing your last known location (${wxLastKnown}). `
+                    : ""}
+                  Live data from Open-Meteo. Your location is used only in your browser - never sent to our servers.
+                </p>
+              </>
+            ) : (
+              <div className="text-center py-10 px-4">
+                {wxStatus === "locating" || wxStatus === "loading" ? (
+                  <>
+                    <div className="w-10 h-10 mx-auto mb-3 rounded-full border-4 border-purple-200 border-t-purple-600 animate-spin" />
+                    <p className="text-sm font-semibold text-stone-600 dark:text-stone-300">
+                      {wxStatus === "locating"
+                        ? "Asking your browser for your exact location..."
+                        : "Loading live weather..."}
+                    </p>
+                    <p className="text-xs text-stone-400 mt-1">
+                      Tap "Allow" when your browser asks for location access.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="i w-8 h-8 mx-auto mb-2 text-purple-400" />
+                    <p className="text-sm font-semibold text-stone-600 dark:text-stone-300 max-w-md mx-auto">
+                      {wxError || "Allow location access or search a city above to see live weather here."}
+                    </p>
+                    <button
+                      onClick={locateMe}
+                      className="mt-3 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+                    >
+                      Allow my location
+                    </button>
+                  </>
+                )}
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -1424,4 +1467,4 @@ export function ExplorePage({ onSendToChat, onToast }: ExplorePageProps) {
       )}
     </section>
   );
-}
+                    }
